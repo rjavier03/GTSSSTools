@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Keyword Search Command Generator</title>
+<style>
+  :root{
+    --bg:#071025;
+    --panel:#0b1220;
+    --muted:#94a3b8;
+    --accent:#7dd3fc;
+    --border: rgba(255,255,255,0.08);
+    --text:#e6eef6;
+    --output-bg:#020617;
+    --note-bg:#0e182e;
+  }
+  html,body{
+    height:100%;margin:0;
+    background:linear-gradient(180deg,var(--bg),#071a2a);
+    color:var(--text);
+    font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+  }
+  .wrap{
+    max-width:880px;margin:40px auto;padding:24px;
+    background:var(--panel);
+    border-radius:12px;
+    box-shadow:0 8px 30px rgba(2,6,23,.6);
+    border:1px solid var(--border);
+  }
+  h1{margin:0 0 10px;font-size:18px;color:var(--accent)}
+  p.lead{margin:0 0 16px;color:var(--muted);font-size:13px}
+  input[type="text"]{
+    width:100%;
+    padding:12px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:#031022;
+    color:var(--text);
+    font-family:ui-monospace,monospace;
+    font-size:14px;
+    box-sizing:border-box;
+  }
+  button{
+    background:linear-gradient(180deg,#0b1220,#071022);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:10px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    margin-top:10px;
+  }
+  button.primary{background:linear-gradient(180deg,#007b8f,#006a7a);font-weight:600}
+  .block{
+    background:var(--output-bg);
+    border-radius:8px;
+    padding:12px;
+    border:1px solid var(--border);
+    font-family:ui-monospace,monospace;
+    font-size:13px;
+    color:#cdeffc;
+    white-space:pre-wrap;
+    min-height:120px;
+    margin-top:16px;
+  }
+  .label{font-weight:600;color:var(--accent);margin-bottom:8px;font-size:14px}
+  .hint{margin-top:8px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Keyword Search Command Generator</h1>
+    <p class="lead">Instruction :</p>
+    <p class="lead">Open mel02test in the winscp <br> Login in the Putty <br> Go to this directory <code>/home/developer/Dev/Src/Trunks/Translations </code></p>
+
+    <div class="label">Enter Keyword</div>
+    <input type="text" id="keyword" placeholder="Type keyword to search...">
+
+    <div class="row">
+      <button class="primary" onclick="generateCommand()">Generate Command</button>
+    </div>
+
+    <div class="label" style="margin-top:20px;">Generated Linux Command</div>
+    <div class="block" id="output" readonly></div>
+
+    <div class="hint">💡 Tip: The command searches inside <code>/home/developer/Dev/Src/Trunks/Translations</code> ignoring <code>.bzr</code> and <code>Makefile</code> paths.</div>
+  </div>
+
+<script>
+  // Sanitize pasted or typed input
+  function sanitizeInput(event) {
+    event.target.value = event.target.value.replace(/\s+/g, ' ').trim();
+  }
+
+  document.getElementById('keyword').addEventListener('input', sanitizeInput);
+  document.getElementById('keyword').addEventListener('paste', e => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData)
+      .getData('text')
+      .replace(/\s+/g, ' ')
+      .trim();
+    document.execCommand('insertText', false, text);
+  });
+
+  function generateCommand() {
+    const keyword = document.getElementById('keyword').value.trim();
+    const output = document.getElementById('output');
+    if (!keyword) {
+      output.textContent = "⚠️ Please enter a keyword.";
+      return;
+    }
+
+    const command = `
+find . -not -path '*/.bzr*' -not -name 'Makefile' -maxdepth 4 -type f -print0 | xargs -0 grep -IilF "${keyword}"`;
+    output.textContent = command;
+  }
+</script>
+</body>
+</html>

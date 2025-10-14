@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C++ Advanced Code Reviewer (translate only)</title>
+<style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    padding: 20px;
+  }
+  textarea {
+    width: 100%;
+    height: 300px;
+    background-color: #252526;
+    color: #d4d4d4;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+  }
+  button {
+    margin-top: 10px;
+    padding: 10px 20px;
+    background-color: #0a84ff;
+    border: none;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  pre {
+    background-color: #252526;
+    padding: 10px;
+    border-radius: 5px;
+    overflow-x: auto;
+  }
+</style>
+</head>
+<body>
+
+<h1>C++ Code Reviewer (translate function only)</h1>
+<textarea id="cppCode" placeholder="Paste your C++ code here..."></textarea>
+<br>
+<button onclick="reviewCode()">Review Code</button>
+
+<h2>Review Results:</h2>
+<pre id="results">No review yet.</pre>
+
+<script>
+function reviewCode() {
+    const code = document.getElementById('cppCode').value;
+    const results = [];
+
+    if (!code.trim()) {
+        document.getElementById('results').textContent = 'Please enter some C++ code.';
+        return;
+    }
+
+    // --- Extract only the body of int Translation::translate() ---
+    const funcRegex = /int\s+Translation::translate\s*\([^)]*\)\s*\{/g;
+    const match = funcRegex.exec(code);
+    if (!match) {
+        document.getElementById('results').textContent = 'Function int Translation::translate() not found.';
+        return;
+    }
+
+    let startIndex = match.index + match[0].length;
+    let braceCount = 1;
+    let endIndex = startIndex;
+
+    while (endIndex < code.length && braceCount > 0) {
+        if (code[endIndex] === '{') braceCount++;
+        if (code[endIndex] === '}') braceCount--;
+        endIndex++;
+    }
+
+    if (braceCount !== 0) {
+        document.getElementById('results').textContent = 'Unbalanced braces in Translation::translate() function.';
+        return;
+    }
+
+    const funcBody = code.slice(startIndex, endIndex - 1); // exclude last closing brace
+
+    // --- Now run the heuristic review on funcBody ---
+    const lines = funcBody.split('\n');
+
+    // Basic Syntax Checks
+    let openBrackets = 0, openParentheses = 0, openBraces = 0, semicolonIssues = 0;
+    lines.forEach((line, index) => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('//') && !trimmed.endsWith(';') && !trimmed.endsWith('{') && !trimmed.endsWith('}')) {
+            semicolonIssues++;
+            results.push(`Line ${index + 1}: Might be missing a semicolon.`);
+        }
+        for (const char of trimmed) {
+            if (char === '(') openParentheses++;
+            if (char === ')') openParentheses--;
+            if (char === '{') openBraces++;
+            if (char === '}') openBraces--;
+            if (char === '[') openBrackets++;
+            if (char === ']') openBrackets--;
+        }
+    });
+    if (openBrackets !== 0) results.push('Unbalanced square brackets detected.');
+    if (openParentheses !== 0) results.push('Unbalanced parentheses detected.');
+    if (openBraces !== 0) results.push('Unbalanced curly braces detected.');
+
+    // Memory Leak Heuristic
+    const newMatches = funcBody.match(/new\s+\w+/g) || [];
+    const deleteMatches = funcBody.match(/delete\s+\w+/g) || [];
+    if (newMatches.length > deleteMatches.length) {
+        results.push('Potential memory leak: more "new" than "delete" calls.');
+    }
+
+    // Dangling Pointer Heuristic
+    const deletePtrRegex = /delete\s+(\w+);/g;
+    let m;
+    while ((m = deletePtrRegex.exec(funcBody)) !== null) {
+        const ptrName = m[1];
+        const ptrUseAfterDelete = new RegExp(ptrName + '\\s*->', 'g');
+        if (ptrUseAfterDelete.test(funcBody.slice(m.index))) {
+            results.push(`Potential dangling pointer: "${ptrName}" used after delete.`);
+        }
+    }
+
+    // Array Out-of-Bounds (fixed-size arrays)
+    const arrayDecl = funcBody.match(/int\s+(\w+)\[(\d+)\]/g);
+    if (arrayDecl) {
+        arrayDecl.forEach(decl => {
+            const arrMatch = decl.match(/int\s+(\w+)\[(\d+)\]/);
+            const arrName = arrMatch[1];
+            const arrSize = parseInt(arrMatch[2]);
+            const accessRegex = new RegExp(arrName + '\\s*\\[(\\d+)\\]', 'g');
+            let a;
+            while ((a = accessRegex.exec(funcBody)) !== null) {
+                const idx = parseInt(a[1]);
+                if (idx >= arrSize) {
+                    results.push(`Potential out-of-bounds access: ${arrName}[${idx}] (size ${arrSize})`);
+                }
+            }
+        });
+    }
+
+    if (results.length === 0) results.push('No obvious issues detected inside Translation::translate() (heuristic scan).');
+
+    document.getElementById('results').textContent = results.join('\n');
+}
+</script>
+
+</body>
+</html>

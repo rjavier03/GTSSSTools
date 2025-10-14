@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>B2BE SQL Query Generator</title>
+  <style>
+    :root{
+      --bg:#071025;
+      --panel:#0b1220;
+      --muted:#94a3b8;
+      --accent:#7dd3fc;
+      --border:rgba(255,255,255,0.08);
+      --text:#e6eef6;
+      --output-bg:#020617;
+    }
+    html,body{
+      height:100%;margin:0;
+      background:linear-gradient(180deg,var(--bg),#071a2a);
+      color:var(--text);
+      font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+    }
+    .wrap{
+      max-width:880px;margin:40px auto;padding:24px;
+      background:var(--panel);
+      border-radius:12px;
+      box-shadow:0 8px 30px rgba(2,6,23,.6);
+      border:1px solid var(--border);
+    }
+    h1{margin:0 0 10px;font-size:20px;color:var(--accent)}
+    p.lead{margin:0 0 16px;color:var(--muted);font-size:13px}
+    label{font-weight:600;color:var(--accent);margin-bottom:4px;display:block;font-size:14px}
+    input[type="text"],input[type="datetime-local"]{
+      width:100%;
+      padding:10px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:#031022;
+      color:var(--text);
+      font-family:ui-monospace,monospace;
+      font-size:14px;
+      box-sizing:border-box;
+    }
+    textarea{
+      width:100%;
+      background:var(--output-bg);
+      color:#cdeffc;
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:12px;
+      font-family:ui-monospace,monospace;
+      font-size:13px;
+      resize:none;
+      min-height:200px;
+      box-sizing:border-box;
+      white-space:pre-wrap;
+    }
+    button{
+      background:linear-gradient(180deg,#0b1220,#071022);
+      border:1px solid var(--border);
+      color:var(--text);
+      padding:10px 14px;
+      border-radius:8px;
+      cursor:pointer;
+      transition:all 0.2s ease;
+    }
+    button:hover{background:linear-gradient(180deg,#0d1b33,#0b1a29)}
+    button.primary{background:linear-gradient(180deg,#007b8f,#006a7a);font-weight:600}
+    button.danger{background:linear-gradient(180deg,#7f1d1d,#991b1b);font-weight:600}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:12px}
+    .checkbox-group{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+    .checkbox-group label{color:var(--text);font-size:13px}
+    .relationship{
+      background:#031022;
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:12px;
+      margin-top:14px;
+      position:relative;
+    }
+    .remove-btn{
+      position:absolute;
+      top:10px;
+      right:10px;
+      background:linear-gradient(180deg,#7f1d1d,#991b1b);
+      border:none;
+      color:white;
+      padding:2px 8px;
+      border-radius:4px;
+      cursor:pointer;
+      font-size:12px;
+    }
+    .section-title{margin-top:20px;font-size:15px;color:var(--accent);font-weight:600}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>B2BE SQL Query Generator</h1>
+    <p class="lead">Generate SQL queries for document relationships quickly and consistently.</p>
+
+    <div id="relationships">
+      <div class="relationship">
+        <button class="remove-btn" onclick="removeRelationship(this)">×</button>
+        <label>SenderB2BEUserID</label>
+        <input type="text" class="sender" placeholder="e.g. bunningsxml-au">
+        <label>ReceiverB2BEUserID</label>
+        <input type="text" class="receiver" placeholder="e.g. hobson-au">
+        <label>B2BEDocumentType</label>
+        <input type="text" class="doctype" placeholder="e.g. PurchaseOrder">
+      </div>
+    </div>
+
+    <button style="margin-top:12px" onclick="addRelationship()">➕ Add Another Relationship</button>
+
+    <div class="section-title">Date Range</div>
+    <div class="grid">
+      <input type="datetime-local" id="startDate">
+      <input type="datetime-local" id="endDate">
+    </div>
+
+    <div class="section-title">B2BEDocumentActionTypeID</div>
+    <div class="checkbox-group">
+      <label><input type="checkbox" value="UPDATECOMPLETED" checked>UPDATECOMPLETED</label>
+      <label><input type="checkbox" value="Delivered" checked>Delivered</label>
+      <label><input type="checkbox" value="ERRORED" checked>ERRORED</label>
+      <label><input type="checkbox" value="RESENT" checked>RESENT</label>
+      <label><input type="checkbox" value="TRAPPEDIGNORABLE" checked>TRAPPEDIGNORABLE</label>
+      <label><input type="checkbox" value="TRAPPEDDUPLICATE" checked>TRAPPEDDUPLICATE</label>
+      <label><input type="checkbox" value="REDELIVERED" checked>REDELIVERED</label>
+    </div>
+
+    <div class="row" style="margin-top:20px;gap:10px;">
+      <button class="primary" onclick="generateQuery()">Generate Query</button>
+      <button onclick="copyQuery()">Copy to Clipboard</button>
+    </div>
+
+    <div class="section-title">Generated SQL Query</div>
+    <textarea id="output" readonly></textarea>
+  </div>
+
+  <script>
+    function pad(num){return num.toString().padStart(2,'0');}
+    function getTodayRange(){
+      const now=new Date();
+      const yyyy=now.getFullYear();
+      const mm=pad(now.getMonth()+1);
+      const dd=pad(now.getDate());
+      return{
+        start:`${yyyy}-${mm}-${dd}T00:00`,
+        end:`${yyyy}-${mm}-${dd}T23:59`
+      };
+    }
+    window.onload=function(){
+      const {start,end}=getTodayRange();
+      document.getElementById('startDate').value=start;
+      document.getElementById('endDate').value=end;
+    };
+
+    function addRelationship(){
+      const div=document.createElement('div');
+      div.className='relationship';
+      div.innerHTML=`
+        <button class="remove-btn" onclick="removeRelationship(this)">×</button>
+        <label>SenderB2BEUserID</label>
+        <input type="text" class="sender" placeholder="e.g. bunningsxml-au">
+        <label>ReceiverB2BEUserID</label>
+        <input type="text" class="receiver" placeholder="e.g. hobson-au">
+        <label>B2BEDocumentType</label>
+        <input type="text" class="doctype" placeholder="e.g. PurchaseOrder">
+      `;
+      document.getElementById('relationships').appendChild(div);
+    }
+
+    function removeRelationship(btn){
+      const box=btn.closest('.relationship');
+      if(document.querySelectorAll('.relationship').length>1) box.remove();
+    }
+
+    function generateQuery(){
+      const startDate=document.getElementById('startDate').value.replace('T',' ') + ':00';
+      const endDate=document.getElementById('endDate').value.replace('T',' ') + ':59';
+      const actions=[...document.querySelectorAll('.checkbox-group input:checked')]
+        .map(c=>`'${c.value}'`).join(', ');
+
+      const relationships=[...document.querySelectorAll('.relationship')].map(r=>{
+        const s=r.querySelector('.sender').value.trim();
+        const rc=r.querySelector('.receiver').value.trim();
+        const dt=r.querySelector('.doctype').value.trim();
+        if(!s||!rc||!dt)return'';
+        return`(BD.\`SenderB2BEUserID\`='${s}' AND BD.\`ReceiverB2BEUserID\`='${rc}' AND BD.\`B2BEDocumentType\`='${dt}')`;
+      }).filter(Boolean);
+
+      const whereClause=relationships.length?`(${relationships.join(' OR ')})`:'1=1';
+
+      const query=`
+SELECT DISTINCT (
+  BD.\`B2BEDocumentInternalID\`
+), BD.\`SenderB2BEUserID\`, BD.\`ReceiverB2BEUserID\`, BD.\`B2BEDocumentType\`, BD.\`PrimaryDocumentID\`,
+BD.\`OriginalSize\`, BD.\`FinalSize\`, BDA.\`B2BEDocumentActionTypeID\`, DATE(BD.\`DateTime\`)
+FROM \`B2BE_DOCUMENT\` AS BD
+INNER JOIN \`B2BE_DOCUMENT_ACTION\` AS BDA 
+  ON BD.\`B2BEDocumentInternalID\` = BDA.\`B2BEDocumentInternalID\`
+WHERE ${whereClause}
+AND BDA.\`DateTime\` >= '${startDate}'
+AND BDA.\`DateTime\` <= '${endDate}'
+AND BDA.\`B2BEDocumentActionTypeID\` IN (${actions});`;
+
+      document.getElementById('output').value=query.trim();
+    }
+
+    function copyQuery(){
+      const output=document.getElementById('output');
+      output.select();
+      document.execCommand('copy');
+      alert('✅ SQL Query copied to clipboard!');
+    }
+  </script>
+</body>
+</html>

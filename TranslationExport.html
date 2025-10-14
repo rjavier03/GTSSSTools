@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Developer Translation Tool</title>
+<style>
+  :root{
+    --bg:#071025;
+    --panel:#0b1220;
+    --muted:#94a3b8;
+    --accent:#7dd3fc;
+    --border:rgba(255,255,255,0.08);
+    --text:#e6eef6;
+    --output-bg:#020617;
+  }
+  html,body{
+    margin:0;
+    padding:0;
+    background:linear-gradient(180deg,var(--bg),#071a2a);
+    color:var(--text);
+    font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+  }
+  body{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:40px;
+  }
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:30px;
+    width:800px;
+    box-shadow:0 8px 30px rgba(2,6,23,.6);
+  }
+  h2{
+    color:var(--accent);
+    text-align:center;
+    margin-bottom:24px;
+    font-size:22px;
+    font-weight:600;
+  }
+
+  /* Form grid */
+  .form-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:20px 28px;
+  }
+  .form-group label{
+    display:block;
+    margin-bottom:6px;
+    color:var(--accent);
+    font-size:14px;
+    font-weight:600;
+  }
+
+  input[type="text"], input[type="number"]{
+    width:100%;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:#031022;
+    color:var(--text);
+    font-family:ui-monospace,monospace;
+    font-size:14px;
+    box-sizing:border-box;
+  }
+  input[type="text"]:focus, input[type="number"]:focus{
+    outline:none;
+    border-color:var(--accent);
+    box-shadow:0 0 0 1px var(--accent);
+  }
+  input.locked{
+    background:#1e293b;
+    color:#64748b;
+  }
+
+  /* Dropdown */
+  .dropdown-container{position:relative;}
+  .dropdown{
+    position:absolute;
+    top:100%;left:0;right:0;
+    background:#031022;
+    border:1px solid var(--border);
+    border-radius:8px;
+    z-index:10;
+    display:none;
+    max-height:150px;
+    overflow-y:auto;
+  }
+  .dropdown.active{display:block;}
+  .dropdown-item{padding:8px;cursor:pointer;}
+  .dropdown-item:hover,.dropdown-item.highlight{
+    background:var(--accent);
+    color:black;
+  }
+
+  /* Radio buttons styled as buttons */
+  .radio-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+    gap:10px;
+    margin-top:6px;
+  }
+  .radio-item{
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#0f1b32;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px 8px;
+    cursor:pointer;
+    transition:all .2s ease;
+    font-size:13px;
+    font-weight:500;
+    color:var(--muted);
+    text-align:center;
+    user-select:none;
+  }
+  .radio-item:hover{
+    background:#132544;
+    border-color:var(--accent);
+    color:var(--text);
+  }
+  .radio-item.active{
+    background:var(--accent);
+    color:#000;
+    border-color:var(--accent);
+    font-weight:600;
+  }
+  .radio-item input[type="radio"]{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+  }
+
+  .output-box{
+    background:var(--output-bg);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:12px;
+    margin-top:24px;
+    white-space:pre-wrap;
+    font-family:ui-monospace,monospace;
+    text-align:center;
+    color:#cdeffc;
+    font-size:15px;
+  }
+  #copyBtn{
+    margin-top:14px;
+    background:linear-gradient(180deg,#007b8f,#006a7a);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 16px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+  }
+  #copyBtn:hover{
+    background:linear-gradient(180deg,#0095a6,#008394);
+  }
+  #instructions{
+    margin-top:20px;
+    color:var(--muted);
+    font-size:13px;
+    background:#0b1220;
+    padding:14px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    white-space:pre-wrap;
+    line-height:1.6;
+  }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <h2>Developer Translation Tool</h2>
+
+    <div class="form-grid">
+      <div class="form-group dropdown-container">
+        <label>Developer Name</label>
+        <input type="text" id="devName" autocomplete="off" placeholder="Type developer name...">
+        <div id="devDropdown" class="dropdown"></div>
+      </div>
+
+      <div class="form-group">
+        <label>Translation Count</label>
+        <input type="number" id="translationCount" value="1" min="1">
+      </div>
+
+      <div class="form-group">
+        <label>Rejected Count</label>
+        <input type="number" id="rejectedCount" value="0">
+      </div>
+
+      <div class="form-group" style="grid-column:span 2">
+        <label>Reason</label>
+        <div id="reasonContainer" class="radio-grid"></div>
+      </div>
+    </div>
+
+    <div class="output-box" id="output"></div>
+    <button id="copyBtn">Copy Output</button>
+
+    <div id="instructions"></div>
+  </div>
+
+  <script src="devlist.js"></script>
+  <script>
+    const devInput=document.getElementById("devName");
+    const dropdown=document.getElementById("devDropdown");
+    let currentFiltered=[];
+    let highlightedIndex=0;
+
+    function renderDropdown(){
+      dropdown.innerHTML="";
+      currentFiltered.forEach((name,index)=>{
+        const item=document.createElement("div");
+        item.className="dropdown-item"+(index===highlightedIndex?" highlight":"");
+        item.textContent=name;
+        item.addEventListener("click",()=>selectName(name));
+        dropdown.appendChild(item);
+      });
+      dropdown.classList.add("active");
+    }
+    function selectName(name){
+      devInput.value=name;
+      dropdown.classList.remove("active");
+      updateOutput();
+    }
+    function showDropdown(filter=""){
+      currentFiltered=devNames.filter(n=>n.toLowerCase().includes(filter.toLowerCase()));
+      if(currentFiltered.length===0){dropdown.classList.remove("active");return;}
+      highlightedIndex=0;
+      renderDropdown();
+    }
+
+    devInput.addEventListener("input",e=>{
+      const val=e.target.value.trim();
+      if(val==="")dropdown.classList.remove("active");
+      else showDropdown(val);
+      updateOutput();
+    });
+    devInput.addEventListener("focus",()=>showDropdown(devInput.value));
+    document.addEventListener("click",e=>{
+      if(!e.target.closest(".dropdown-container"))dropdown.classList.remove("active");
+    });
+    devInput.addEventListener("keydown",e=>{
+      if(!dropdown.classList.contains("active")||currentFiltered.length===0)return;
+      if(["ArrowDown","ArrowRight"].includes(e.key)){
+        e.preventDefault();
+        highlightedIndex=(highlightedIndex+1)%currentFiltered.length;
+        renderDropdown();
+      }else if(["ArrowUp","ArrowLeft"].includes(e.key)){
+        e.preventDefault();
+        highlightedIndex=(highlightedIndex-1+currentFiltered.length)%currentFiltered.length;
+        renderDropdown();
+      }else if(e.key==="Enter"){
+        e.preventDefault();
+        selectName(currentFiltered[highlightedIndex]);
+      }else if(e.key==="Tab"){
+        if(currentFiltered.length>0){
+          e.preventDefault();
+          selectName(currentFiltered[0]);
+        }
+      }
+    });
+
+    const reasons=["EXPORTED","ERRPRIO","INCDATA","ERRDATA","TRANSLATION","TESTING","FRIDAY","NOGTASS","OTHERPROJ","NOPENDING","TESTPENDING","FREEZE","CHECKOUT","RECORDEXIST","ERRSQL","TABLECHANGE","DEVLOG","LINK","CUTOFF","NOACTION","NOREVIEW"];
+    const reasonContainer=document.getElementById("reasonContainer");
+    reasons.forEach(r=>{
+      const div=document.createElement("div");
+      div.className="radio-item";
+      const input=document.createElement("input");
+      input.type="radio";
+      input.name="reason";
+      input.value=r;
+      if(r==="EXPORTED")input.checked=true;
+      div.appendChild(input);
+      const label=document.createElement("span");
+      label.textContent=r;
+      div.appendChild(label);
+      if(r==="EXPORTED")div.classList.add("active");
+      div.addEventListener("click",()=>{
+        document.querySelectorAll(".radio-item").forEach(i=>i.classList.remove("active"));
+        div.classList.add("active");
+        input.checked=true;
+        updateRejectedField();
+        updateOutput();
+      });
+      reasonContainer.appendChild(div);
+    });
+
+    const rejectedInput=document.getElementById("rejectedCount");
+    const translationInput=document.getElementById("translationCount");
+
+    function updateRejectedField(){
+      const selected=document.querySelector('input[name="reason"]:checked').value;
+      if(selected==="EXPORTED"){
+        rejectedInput.value="0";
+        rejectedInput.readOnly=true;
+        rejectedInput.classList.add("locked");
+      }else{
+        rejectedInput.readOnly=false;
+        rejectedInput.classList.remove("locked");
+      }
+    }
+
+    [devInput,translationInput,rejectedInput].forEach(el=>{
+      el.addEventListener("input",updateOutput);
+      el.addEventListener("change",updateOutput);
+    });
+
+    function updateOutput(){
+      const devName=devInput.value.trim();
+      const translationCount=translationInput.value.trim()||"1";
+      const reason=document.querySelector("input[name='reason']:checked").value;
+      const rejectedCount=reason==="EXPORTED"?"0":(rejectedInput.value.trim()||"0");
+      const result=devName?`|${devName}|${translationCount}|${rejectedCount}|${reason}`:"";
+      document.getElementById("output").textContent=result;
+    }
+
+    const instructionText=`Rejected Reason Codes and Descriptions
+
+ERRPRIO – Incorrect Priority Level
+INCDATA – Incomplete data in request form
+ERRDATA – Incorrect data in request form
+TRANSLATION – Translation changes required
+TESTING – Insufficient testing
+FRIDAY – Friday deployment restriction
+NOGTASS – Deployment outside working hours
+OTHERPROJ – Has pending change/s from other project/s
+NOPENDING – No pending change
+TESTPENDING – Has pending change/s yet to be deployed to UAT
+FREEZE – Change Freeze
+CHECKOUT – Translation checked out by developer
+RECORDEXIST – Records already existing in table
+ERRSQL – Incorrect/Invalid SQL Query
+TABLECHANGE – Table changes required
+DEVLOG – Changes not included in development log
+LINK – Unaccessible request form link
+CUTOFF – Deployment date does not meet minimum cut off
+NOACTION – Request is cancelled
+NOREVIEW – Not reviewed before raise
+EXPORTED – Request is approved and deployed`;
+    document.getElementById("instructions").textContent=instructionText;
+
+    document.getElementById("copyBtn").addEventListener("click",()=>{
+      const text=document.getElementById("output").textContent.trim();
+      if(!text)return;
+      navigator.clipboard.writeText(text).then(()=>{
+        const btn=document.getElementById("copyBtn");
+        const original=btn.textContent;
+        btn.textContent="Copied!";
+        setTimeout(()=>btn.textContent=original,1500);
+      });
+    });
+
+    updateRejectedField();
+    updateOutput();
+  </script>
+</body>
+</html>

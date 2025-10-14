@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Translation Update Generator</title>
+<style>
+  :root{
+    --bg:#071025;
+    --panel:#0b1220;
+    --muted:#94a3b8;
+    --accent:#7dd3fc;
+    --border: rgba(255,255,255,0.08);
+    --text:#e6eef6;
+    --output-bg:#020617;
+    --note-bg:#0e182e;
+  }
+  html,body{
+    height:100%;margin:0;
+    background:linear-gradient(180deg,var(--bg),#071a2a);
+    color:var(--text);
+    font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+  }
+  .wrap{
+    max-width:880px;margin:40px auto;padding:24px;
+    background:var(--panel);
+    border-radius:12px;
+    box-shadow:0 8px 30px rgba(2,6,23,.6);
+    border:1px solid var(--border);
+  }
+  h1{margin:0 0 10px;font-size:18px;color:var(--accent)}
+  p.lead{margin:0 0 16px;color:var(--muted);font-size:13px}
+  input[type="text"], textarea{
+    width:100%;
+    padding:12px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:#031022;
+    color:var(--text);
+    font-family:ui-monospace,monospace;
+    font-size:14px;
+    box-sizing:border-box;
+  }
+  textarea{resize:vertical; min-height:70px;}
+  button{
+    background:linear-gradient(180deg,#0b1220,#071022);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:10px 12px;
+    border-radius:8px;
+    cursor:pointer;
+  }
+  button.primary{background:linear-gradient(180deg,#007b8f,#006a7a);font-weight:600}
+  .label{font-weight:600;color:var(--accent);margin-top:12px;margin-bottom:6px;font-size:14px}
+  .block{
+    background:var(--output-bg);
+    border-radius:8px;
+    padding:12px;
+    border:1px solid var(--border);
+    font-family:ui-monospace,monospace;
+    font-size:13px;
+    color:#cdeffc;
+    white-space:pre-wrap;
+    min-height:200px;
+  }
+  .row{display:flex;gap:10px;margin-top:12px;align-items:center}
+  .hint{margin-top:8px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Translation Update Generator</h1>
+  <p class="lead">Generate formatted translation update notes quickly and consistently.</p>
+
+  <div class="label">Translation Name:</div>
+  <input type="text" id="translationName" placeholder="e.g. kleintools-autototaltools-auorderackcustom">
+
+  <div class="label">Changes:</div>
+  <textarea id="changes" placeholder="Describe the changes here..."></textarea>
+
+  <div class="label">Dev/Test:</div>
+  <input type="text" id="devTest" placeholder="Default: 0.5hr">
+
+  <div class="label">Review/Export:</div>
+  <input type="text" id="reviewExport" placeholder="Default: 0.5hr">
+
+  <div class="label">Impacted:</div>
+  <input type="text" id="impacted" placeholder="Default: N/A">
+
+  <div class="label">Pending:</div>
+  <input type="text" id="pending" placeholder="Default: N/A">
+
+  <div class="row">
+    <button class="primary" onclick="generateOutput()">Generate</button>
+    <button id="copyBtn" onclick="copyOutput()">Copy</button>
+  </div>
+
+  <div class="label" style="margin-top:20px;">Generated Output:</div>
+  <div class="block" id="output"></div>
+</div>
+
+<script>
+function generateOutput() {
+  const translationName = document.getElementById("translationName").value.trim();
+  const changes = document.getElementById("changes").value.trim();
+  let devTest = document.getElementById("devTest").value.trim() || "0.5hr";
+  let reviewExport = document.getElementById("reviewExport").value.trim() || "0.5hr";
+  let impacted = document.getElementById("impacted").value.trim() || "N/A";
+  let pending = document.getElementById("pending").value.trim() || "N/A";
+
+  devTest = ensureHr(devTest);
+  reviewExport = ensureHr(reviewExport);
+
+  const totalHrs = sumHours(devTest, reviewExport);
+
+  let prefix = "UPDATE";
+  const lower = translationName.toLowerCase();
+  if (lower.includes("custom")) prefix = "UPDATE CT";
+  else if (lower.includes("tob2bexml")) prefix = "UPDATE SX";
+  else if (lower.includes("rinteg")) prefix = "UPDATE RINTEG";
+  else if (lower.includes("sinteg")) prefix = "UPDATE SINTEG";
+  else if (lower.includes("fromb2bexml")) prefix = "UPDATE XR";
+
+  const output =
+`${prefix} : ${translationName}
+${changes ? changes + "\n" : ""}
+Total Man Hours: ${totalHrs}hrs
+Dev/Test: ${devTest}
+Review/Export: ${reviewExport}
+Impacted: ${impacted}
+Pending: ${pending}`;
+
+  document.getElementById("output").textContent = output.trim();
+}
+
+function ensureHr(value) {
+  value = value.trim();
+  if (!/hr/i.test(value)) value += "hr";
+  return value;
+}
+
+function sumHours(dev, review) {
+  const d = parseFloat(dev) || 0.5;
+  const r = parseFloat(review) || 0.5;
+  return (d + r).toFixed(1).replace(/\.0$/, '');
+}
+
+function copyOutput() {
+  const output = document.getElementById("output").textContent;
+  const copyBtn = document.getElementById("copyBtn");
+  if (!output.trim()) return alert("⚠️ No output to copy!");
+  
+  navigator.clipboard.writeText(output).then(() => {
+    copyBtn.textContent = "Copied!";
+    setTimeout(() => copyBtn.textContent = "Copy", 1200);
+  });
+}
+</script>
+</body>
+</html>

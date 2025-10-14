@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple XML Beautifier + Extractor</title>
+  <style>
+    :root{--bg:#0f1724;--panel:#0b1220;--muted:#94a3b8;--accent:#7dd3fc;--tag:#ffd580}
+    body{
+      font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+      background:linear-gradient(180deg,#071025 0%, #071a2a 100%);
+      color:#e6eef6;margin:0;min-height:100vh;
+      display:flex;align-items:center;justify-content:center;padding:32px
+    }
+    .card{
+      width:980px;max-width:95%;
+      background:var(--panel);
+      border-radius:12px;padding:18px;
+      box-shadow:0 6px 30px rgba(2,6,23,.6)
+    }
+    h1{margin:0 0 8px;font-size:18px}
+    p.sub{margin:0 0 14px;color:var(--muted);font-size:13px}
+    .row{display:flex;gap:12px}
+    textarea{
+      flex:1;height:320px;background:#031022;
+      border:1px solid rgba(255,255,255,.04);
+      color:#dbeafe;padding:12px;border-radius:8px;
+      font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size:13px;resize:vertical
+    }
+    .controls{width:240px;min-width:200px;display:flex;flex-direction:column;gap:10px}
+    button, select{
+      background:linear-gradient(180deg,#0b1220,#071022);
+      border:1px solid rgba(255,255,255,.04);
+      padding:10px;border-radius:8px;color:#e6eef6;cursor:pointer
+    }
+    button:active{transform:translateY(1px)}
+    .output{margin-top:12px;background:#020617;border-radius:8px;padding:12px;max-height:360px;overflow:auto;font-family:ui-monospace, monospace;font-size:13px}
+    pre{margin:0;white-space:pre-wrap;word-break:break-word}
+    .line{display:block}
+    .xml-tag{color:var(--accent)}
+    .xml-name{color:var(--tag);font-weight:600}
+    .xml-attr{color:#93c5fd}
+    .xml-value{color:#a7f3d0}
+    .xml-comment{color:#94a3b8;font-style:italic}
+    .error{color:#ff7b72;background:linear-gradient(90deg, rgba(255,123,114,0.08), rgba(255,123,114,0.02));padding:8px;border-radius:6px}
+    .small{font-size:12px;color:var(--muted)}
+    .flex-row{display:flex;gap:8px}
+    a.link{color:var(--accent);text-decoration:none}
+    .extract-section{margin-top:16px;background:#031022;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);}
+    .extract-results{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}
+    .extract-item{background:#020617;padding:6px 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);font-size:13px;color:#aefaff}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Simple XML Beautifier</h1>
+    <p class="sub">Paste the XML without the B2BE Header.</p>
+
+    <div class="row">
+      <textarea id="input" placeholder="Paste XML here..."></textarea>
+
+      <div class="controls">
+        <div class="flex-row">
+          <button id="beautifyBtn">Beautify</button>
+          <button id="minifyBtn">Minify</button>
+        </div>
+        <div class="flex-row">
+          <button id="copyBtn">Copy Result</button>
+          <button id="downloadBtn">Download .xml</button>
+        </div>
+        <label class="small">Indentation
+          <select id="indent">
+            <option value="4" selected>4 spaces</option>
+            
+          </select>
+        </label>
+
+        <div class="small">Options</div>
+        <label class="small"><input type="checkbox" id="escapeHtml"> Escape &lt; and &gt; in output</label>
+        <div style="flex:1"></div>
+        <div class="small">No external libs. Local-only.</div>
+      </div>
+    </div>
+
+    <!-- Extractor -->
+    <div class="extract-section">
+      <label for="segment" class="small">XML Segment Path (e.g. <code>IDOC/Animals/Mammal/Cat</code>)</label>
+      <input type="text" id="segment" style="width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:#020617;color:#e6eef6;font-family:ui-monospace;font-size:13px" placeholder="Enter XML path...">
+      <button style="margin-top:8px" onclick="extractValues()">Extract Values</button>
+      <div id="extractResults" class="extract-results"></div>
+    </div>
+
+    <div class="output" id="output"><pre id="outpre"></pre></div>
+  </div>
+
+<script>
+// --- XML Parser ---
+function parseXml(input){
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(input, 'application/xml');
+  const err = doc.querySelector('parsererror');
+  if(err){ throw new Error(err.textContent.trim()); }
+  return doc;
+}
+
+// --- Beautify / Minify (same as before) ---
+function serializeAndIndent(node, indentStr){
+  const isTextNode = n => n.nodeType === Node.TEXT_NODE && n.nodeValue.trim() !== '';
+  function walk(n, depth){
+    let out='', pad=indentStr.repeat(depth);
+    if(n.nodeType===Node.DOCUMENT_NODE){ n.childNodes.forEach(c=>out+=walk(c,depth)); return out; }
+    if(n.nodeType===Node.ELEMENT_NODE){
+      const attrs=Array.from(n.attributes||[]).map(a=>` ${a.name}="${a.value.replace(/"/g,'&quot;')}"`).join('');
+      if(n.childNodes.length===0){
+        out+=`${pad}<${n.nodeName}${attrs}/>\n`;
+      } else if(n.childNodes.length===1 && isTextNode(n.childNodes[0])){
+        out+=`${pad}<${n.nodeName}${attrs}>${n.childNodes[0].nodeValue.trim()}</${n.nodeName}>\n`;
+      } else {
+        out+=`${pad}<${n.nodeName}${attrs}>\n`;
+        n.childNodes.forEach(c=>out+=walk(c,depth+1));
+        out+=`${pad}</${n.nodeName}>\n`;
+      }
+    } else if(n.nodeType===Node.TEXT_NODE){
+      const v=n.nodeValue.trim(); if(v) out+=pad+v+'\n';
+    }
+    return out;
+  }
+  return walk(node,0);
+}
+
+const input=document.getElementById('input');
+const outpre=document.getElementById('outpre');
+const beautifyBtn=document.getElementById('beautifyBtn');
+const minifyBtn=document.getElementById('minifyBtn');
+const indentSel=document.getElementById('indent');
+const escapeHtmlChk=document.getElementById('escapeHtml');
+const copyBtn=document.getElementById('copyBtn');
+const downloadBtn=document.getElementById('downloadBtn');
+
+function showError(msg){ outpre.innerHTML=`<div class='error'>${msg}</div>`; }
+
+function doBeautify(){
+  try{
+    const doc=parseXml(input.value);
+    const indentVal=indentSel.value==='\t'?'\t':' '.repeat(Number(indentSel.value));
+    const pretty=serializeAndIndent(doc,indentVal);
+    outpre.textContent=pretty;
+  }catch(e){showError(e.message);}
+}
+
+function doMinify(){
+  try{
+    const doc=parseXml(input.value);
+    const txt=new XMLSerializer().serializeToString(doc);
+    const min=txt.replace(/>\s+</g,'><').trim();
+    outpre.textContent=min;
+  }catch(e){showError(e.message);}
+}
+
+beautifyBtn.onclick=doBeautify;
+minifyBtn.onclick=doMinify;
+
+// --- Copy and Download ---
+copyBtn.onclick=()=>{
+  navigator.clipboard.writeText(outpre.textContent).then(()=>{
+    copyBtn.textContent='Copied!';
+    setTimeout(()=>copyBtn.textContent='Copy Result',1200);
+  });
+};
+downloadBtn.onclick=()=>{
+  const blob=new Blob([outpre.textContent],{type:'application/xml'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='document.xml';
+  a.click();
+};
+
+// --- Extract XML Values ---
+function extractValues(){
+  const segment=document.getElementById('segment').value.trim();
+  const container=document.getElementById('extractResults');
+  container.innerHTML='';
+  if(!segment) return container.innerHTML='<div class="error">Please enter an XML segment path.</div>';
+
+  try{
+    const xml=parseXml(input.value);
+    // Convert path like "IDOC/Animals/Mammal/Cat" → "IDOC > Animals > Mammal > Cat"
+    const path=segment.split('/').filter(Boolean);
+    let nodes=[xml];
+    for(const tag of path){
+      let next=[];
+      nodes.forEach(n=>next.push(...n.getElementsByTagName(tag)));
+      nodes=next;
+    }
+
+    if(nodes.length===0){
+      container.innerHTML='<div class="error">No matches found.</div>';
+      return;
+    }
+
+    nodes.forEach(n=>{
+      if(n && n.textContent.trim()){
+        const div=document.createElement('div');
+        div.className='extract-item';
+        div.textContent=n.textContent.trim();
+        container.appendChild(div);
+      }
+    });
+  }catch(e){
+    container.innerHTML=`<div class="error">Parse error: ${e.message}</div>`;
+  }
+}
+
+// initial beautify
+doBeautify();
+</script>
+</body>
+</html>

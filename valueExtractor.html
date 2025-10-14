@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Field Extractor</title>
+<style>
+  :root{
+    --bg:#071025;
+    --panel:#0b1220;
+    --muted:#94a3b8;
+    --accent:#7dd3fc;
+    --border: rgba(255,255,255,0.08);
+    --text:#e6eef6;
+    --output-bg:#020617;
+  }
+  html,body{
+    height:100%;margin:0;
+    background:linear-gradient(180deg,var(--bg),#071a2a);
+    color:var(--text);
+    font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+  }
+  .wrap{
+    max-width:880px;margin:40px auto;padding:24px;
+    background:var(--panel);
+    border-radius:12px;
+    box-shadow:0 8px 30px rgba(2,6,23,.6);
+    border:1px solid var(--border);
+  }
+  h1{margin:0 0 10px;font-size:18px;color:var(--accent)}
+  p.lead{margin:0 0 16px;color:var(--muted);font-size:13px}
+  input[type="text"], textarea{
+    width:100%;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:#031022;
+    color:var(--text);
+    font-family:ui-monospace,monospace;
+    font-size:14px;
+    box-sizing:border-box;
+  }
+  textarea{min-height:100px;resize:vertical;}
+  button{
+    background:linear-gradient(180deg,#0b1220,#071022);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:10px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    transition:all .2s;
+  }
+  button.primary{background:linear-gradient(180deg,#007b8f,#006a7a);font-weight:600}
+  button:hover{opacity:.9;transform:translateY(-1px)}
+  .block{
+    background:var(--output-bg);
+    border-radius:8px;
+    padding:12px;
+    border:1px solid var(--border);
+    font-family:ui-monospace,monospace;
+    font-size:13px;
+    color:#cdeffc;
+    white-space:pre-wrap;
+    min-height:80px;
+  }
+  .label{font-weight:600;color:var(--accent);margin:8px 0 4px;font-size:14px}
+  .radio-group{display:flex;gap:16px;align-items:center;margin-bottom:10px}
+  .radio-group label{color:var(--muted);font-size:13px;cursor:pointer}
+  .value-item{
+    padding:6px 10px;
+    background:#0e1a2b;
+    border-radius:6px;
+    margin-bottom:6px;
+    border:1px solid var(--border);
+  }
+  .copy-container {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-top:10px;
+  }
+  .copy-status {
+    font-size:12px;
+    color:#7dd3fc;
+    opacity:0;
+    transition:opacity .3s;
+  }
+  .copy-status.show { opacity:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Field Extractor</h1>
+  <p class="lead">Extract one or multiple values from EDIFACT or CSV sources using manual or code definitions.</p>
+
+  <div class="label">Source</div>
+  <textarea id="source" placeholder="Paste your EDIFACT or CSV source here"></textarea>
+
+  <div class="label">Source Type</div>
+  <div class="radio-group">
+    <label><input type="radio" name="sourceType" value="edifact" checked> EDIFACT</label>
+    <label><input type="radio" name="sourceType" value="csv"> CSV</label>
+  </div>
+
+  <div class="label">Mode</div>
+  <div class="radio-group">
+    <label><input type="radio" name="mode" value="manual" checked> Manual</label>
+    <label><input type="radio" name="mode" value="code"> Code</label>
+  </div>
+
+  <!-- MANUAL FIELDS -->
+  <div id="manualFields">
+    <div id="ediFields">
+      <div class="label">Segment (for EDIFACT)</div>
+      <input type="text" id="segment" placeholder="e.g. UNH or LIN">
+      <div class="label">Nth Field</div>
+      <input type="text" id="nthField" placeholder="e.g. 3">
+      <div class="label">Field Delimiter</div>
+      <input type="text" id="delimiter" placeholder="e.g. +">
+      <div class="label">Nth Subfield</div>
+      <input type="text" id="nthSubfield" placeholder="e.g. 1">
+      
+      <div class="label">Subfield Delimiter</div>
+      <input type="text" id="subDelimiter" placeholder="e.g. :">
+    </div>
+
+    <div id="csvFields" style="display:none;">
+      <div class="label">Nth Field</div>
+      <input type="text" id="csvField" placeholder="e.g. 2">
+      <div class="label">Delimiter</div>
+      <input type="text" id="csvDelimiter" placeholder="e.g. , or |">
+    </div>
+  </div>
+
+  <!-- CODE FIELDS -->
+  <div id="codeFields" style="display:none;">
+    <div class="label">Code Input</div>
+    <input type="text" id="codeInput" placeholder="e.g. YB_V2Util::TakeFieldEDIFACT(content, 3, 1);">
+    <div class="label">Segment (for EDIFACT)</div>
+    <input type="text" id="codeSegment" placeholder="e.g. UNH or LIN">
+  </div>
+
+  <div style="margin-top:16px;">
+    <button class="primary" onclick="extract()">Extract Value</button>
+  </div>
+
+  <div class="copy-container">
+    <div class="label" style="margin-top:20px;">Extracted Value(s)</div>
+    <div>
+      <button id="copyBtn" onclick="copyResults()">Copy</button>
+      <span id="copyStatus" class="copy-status">Copied!</span>
+    </div>
+  </div>
+  <div class="block" id="output">(nothing yet)</div>
+</div>
+
+<script>
+  // Toggle Manual/Code
+  document.querySelectorAll('input[name="mode"]').forEach(radio => {
+    radio.addEventListener('change', e => {
+      const manual = e.target.value === 'manual';
+      document.getElementById('manualFields').style.display = manual ? 'block' : 'none';
+      document.getElementById('codeFields').style.display = manual ? 'none' : 'block';
+    });
+  });
+
+  // Toggle EDIFACT/CSV
+  document.querySelectorAll('input[name="sourceType"]').forEach(radio => {
+    radio.addEventListener('change', e => {
+      const type = e.target.value;
+      document.getElementById('ediFields').style.display = type === 'edifact' ? 'block' : 'none';
+      document.getElementById('csvFields').style.display = type === 'csv' ? 'block' : 'none';
+    });
+  });
+
+  // Extraction logic
+  function extractEDIFACT(source, segment, fieldIndex, subFieldIndex, fieldDelimiter="+", subFieldDelimiter=":") {
+    const segments = source.split("'");
+    const matches = segments.filter(s => s.trim().startsWith(segment + "+"));
+    if (matches.length === 0) return ["(segment not found)"];
+    
+    const results = [];
+    for (const seg of matches) {
+      const fields = seg.split(fieldDelimiter);
+      const field = fields[fieldIndex - 1] || "";
+      const subFields = field.split(subFieldDelimiter);
+      const subField = subFields[subFieldIndex - 1] || "";
+      if (subField.trim() !== "") results.push(subField.replace(/['\s]+$/, ''));
+    }
+    return results.length ? results : ["(no value extracted)"];
+  }
+
+  function extractCSV(source, delimiter, fieldIndex) {
+    const lines = source.split(/\r?\n/).filter(l => l.trim());
+    const results = [];
+    for (const line of lines) {
+      const fields = line.split(delimiter);
+      if (fields[fieldIndex - 1]) results.push(fields[fieldIndex - 1].trim());
+    }
+    return results.length ? results : ["(no value extracted)"];
+  }
+
+  function extract() {
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+    const sourceType = document.querySelector('input[name="sourceType"]:checked').value;
+    const source = document.getElementById('source').value.trim();
+    const output = document.getElementById('output');
+
+    if (!source) {
+      output.textContent = "Please enter source data.";
+      return;
+    }
+
+    let results = [];
+
+    if (mode === "manual") {
+      if (sourceType === "edifact") {
+        const segment = document.getElementById('segment').value.trim();
+        const fieldIndex = parseInt(document.getElementById('nthField').value.trim() || "0");
+        const subFieldIndex = parseInt(document.getElementById('nthSubfield').value.trim() || "0");
+        const delimiter = document.getElementById('delimiter').value || "+";
+        const subDelimiter = document.getElementById('subDelimiter').value || ":";
+        results = extractEDIFACT(source, segment, fieldIndex, subFieldIndex, delimiter, subDelimiter);
+      } else {
+        const fieldIndex = parseInt(document.getElementById('csvField').value.trim() || "0");
+        const delimiter = document.getElementById('csvDelimiter').value || ",";
+        results = extractCSV(source, delimiter, fieldIndex);
+      }
+    } else {
+      const codeInput = document.getElementById('codeInput').value.trim();
+      const codeSegment = document.getElementById('codeSegment').value.trim();
+      const ediMatch = codeInput.match(/TakeFieldEDIFACT\([^,]+,\s*(\d+),\s*(\d+)\)/);
+      const csvMatch = codeInput.match(/TakeField\([^,]+,\s*(\d+),/);
+
+      if (ediMatch) {
+        const fieldIdx = parseInt(ediMatch[1]);
+        const subFieldIdx = parseInt(ediMatch[2]);
+        results = extractEDIFACT(source, codeSegment, fieldIdx, subFieldIdx);
+      } else if (csvMatch) {
+        const fieldIdx = parseInt(csvMatch[1]);
+        results = extractCSV(source, ",", fieldIdx);
+      } else {
+        results = ["(unrecognized code format)"];
+      }
+    }
+
+    output.innerHTML = results.map(v => `<div class='value-item'>${v}</div>`).join("");
+  }
+
+  function copyResults() {
+    const outputDiv = document.getElementById('output');
+    const values = Array.from(outputDiv.querySelectorAll('.value-item')).map(el => el.textContent).join('\n');
+    if (!values.trim()) return;
+    navigator.clipboard.writeText(values).then(() => {
+      const status = document.getElementById('copyStatus');
+      status.classList.add('show');
+      setTimeout(() => status.classList.remove('show'), 1200);
+    });
+  }
+</script>
+</body>
+</html>

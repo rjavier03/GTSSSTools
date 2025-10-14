@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UTF-8 to C++ append(1, char(...)) Generator</title>
+<style>
+  :root{--bg:#0f1724;--panel:#0b1220;--muted:#94a3b8;--accent:#7dd3fc;--tag:#ffd580}
+  body{
+    font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+    background:linear-gradient(180deg,#071025 0%, #071a2a 100%);
+    color:#e6eef6;margin:0;min-height:100vh;
+    display:flex;align-items:center;justify-content:center;padding:32px
+  }
+  .card{
+    width:680px;max-width:95%;
+    background:var(--panel);
+    border-radius:12px;padding:18px;
+    box-shadow:0 6px 30px rgba(2,6,23,.6)
+  }
+  h1{margin:0 0 8px;font-size:18px}
+  p.sub{margin:0 0 14px;color:var(--muted);font-size:13px}
+  input{
+    font-size:22px;padding:10px 16px;border-radius:8px;
+    background:#031022;color:#dbeafe;border:1px solid rgba(255,255,255,.05);
+    text-align:center;width:120px
+  }
+  .output{
+    margin-top:16px;background:#020617;border-radius:8px;
+    padding:12px;max-height:360px;overflow:auto;
+    font-family:ui-monospace, monospace;font-size:13px;
+    position:relative;
+  }
+  pre{margin:0;white-space:pre-wrap;word-break:break-word}
+  .small{font-size:12px;color:var(--muted)}
+  button.copy{
+    position:absolute;top:10px;right:10px;
+    background:linear-gradient(180deg,#0b1220,#071022);
+    border:1px solid rgba(255,255,255,.08);
+    padding:6px 10px;border-radius:6px;
+    color:#e6eef6;cursor:pointer;font-size:12px;
+    transition:all .2s ease;
+  }
+  button.copy:hover{border-color:var(--accent);color:var(--accent)}
+  button.copy:active{transform:translateY(1px)}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>UTF-8 → C++ <code>append(1, char(...))</code> Generator</h1>
+    <p class="sub">Paste a symbol below and it will generate the full C++ code including variable declaration.</p>
+    <input id="symbol" maxlength="4" placeholder="€">
+    <div class="output">
+      <button id="copyBtn" class="copy">Copy</button>
+      <pre id="output">// Result will appear here</pre>
+    </div>
+    <p class="small">Example: €, °, ©, ™ or any Unicode symbol.</p>
+  </div>
+
+<script>
+const output = document.getElementById('output');
+const symbolInput = document.getElementById('symbol');
+const copyBtn = document.getElementById('copyBtn');
+
+// Known symbols → preferred camelCase names
+const knownSymbols = {
+  '€': 'euroSign',
+  '°': 'degreeSign',
+  '©': 'copyrightSign',
+  '®': 'registeredSign',
+  '™': 'trademarkSign',
+  '£': 'poundSign',
+  '¥': 'yenSign',
+  '¢': 'centSign',
+  '∞': 'infinitySign',
+  'µ': 'microSign',
+  '÷': 'divideSign'
+};
+
+// Convert symbol to camelCase variable name if not known
+function toCamelCaseFromSymbol(sym) {
+  let base = sym.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove accents
+  base = base.replace(/[^a-zA-Z0-9]+/g, ''); // remove non-alphanumerics
+  if (!base) base = 'symbol'; // fallback if nothing left
+  return base.charAt(0).toLowerCase() + base.slice(1);
+}
+
+function generateOutput(symbol) {
+  const encoder = new TextEncoder();
+  const bytes = Array.from(encoder.encode(symbol));
+  let varName = knownSymbols[symbol] || toCamelCaseFromSymbol(symbol);
+  const declaration = `string ${varName} = "";`;
+  const lines = bytes.map(b => `${varName}.append(1, char(${b}));`);
+  return `${declaration}\n${lines.join('\n')}`;
+}
+
+symbolInput.addEventListener('input', () => {
+  const symbol = symbolInput.value.trim();
+  if (!symbol) {
+    output.textContent = '// Result will appear here';
+    return;
+  }
+  output.textContent = generateOutput(symbol);
+});
+
+// Copy button logic
+copyBtn.addEventListener('click', async () => {
+  const text = output.textContent.trim();
+  if (!text || text.startsWith('//')) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    copyBtn.textContent = 'Copied!';
+    setTimeout(() => copyBtn.textContent = 'Copy', 1000);
+  } catch (err) {
+    copyBtn.textContent = 'Error';
+    setTimeout(() => copyBtn.textContent = 'Copy', 1000);
+  }
+});
+</script>
+</body>
+</html>
