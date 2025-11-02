@@ -22,7 +22,8 @@
     display:flex;align-items:center;justify-content:center;
   }
   .wrap{
-    max-width:640px;width:90%;
+    max-width:900px;
+    width:90%;
     background:var(--panel);
     border:1px solid var(--border);
     border-radius:16px;
@@ -42,8 +43,18 @@
   }
   .menu{
     display:grid;
-    grid-template-columns:1fr 1fr;
+    grid-template-columns:repeat(3, 1fr);
     gap:20px;
+  }
+  @media(max-width:900px){
+    .menu{
+      grid-template-columns:repeat(2, 1fr);
+    }
+  }
+  @media(max-width:600px){
+    .menu{
+      grid-template-columns:1fr;
+    }
   }
   a.card{
     display:flex;
@@ -81,11 +92,12 @@
       <a class="card" href="./transactioncount.html">Transaction Count Generator</a>
       <a class="card" href="./TranslationKeyWordSearch.html">Translation Keyword Search</a>
       <a class="card" href="./PQSimleRestart.html">Simple PQ Command</a>
-      <a class="card" href="./valueExtractor.html">Field Extract(EDIFact,CSV)</a>
+      <a class="card" href="./valueExtractor.html">Field Extract (EDIFact, CSV)</a>
       <a class="card" href="./RequirementTemplate.html">Requirement Template</a>
       <a class="card" href="./SpecialCharCode.html">Special Char Code Generator</a>
       <a class="card" href="./TranslationExport.html">Export Dev Template</a>
       <a class="card" href="./filerestore.html">Restore File Template</a>
+      <a class="card" href="./invalidcharchecker.html">Invalid Char Checker</a>
     </div>
     <footer>© 2025 Developer Utilities</footer>
   </div>

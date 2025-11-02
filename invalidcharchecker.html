@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UTF-8 Invalid Character Detector</title>
+  <style>
+    :root {
+      --bg:#071025;
+      --panel:#0b1220;
+      --muted:#94a3b8;
+      --accent:#7dd3fc;
+      --border: rgba(255,255,255,0.08);
+      --text:#e6eef6;
+      --output-bg:#020617;
+    }
+    html,body {
+      height:100%;margin:0;
+      background:linear-gradient(180deg,var(--bg),#071a2a);
+      color:var(--text);
+      font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+    }
+    .wrap {
+      max-width:880px;margin:40px auto;padding:24px;
+      background:var(--panel);
+      border-radius:12px;
+      box-shadow:0 8px 30px rgba(2,6,23,.6);
+      border:1px solid var(--border);
+    }
+    h1 {margin:0 0 10px;font-size:18px;color:var(--accent)}
+    p.lead {margin:0 0 16px;color:var(--muted);font-size:13px}
+    textarea {
+      width:100%;
+      padding:12px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:#031022;
+      color:var(--text);
+      font-family:ui-monospace,monospace;
+      font-size:14px;
+      box-sizing:border-box;
+      resize:vertical;min-height:100px;
+    }
+    button {
+      background:linear-gradient(180deg,#0b1220,#071022);
+      border:1px solid var(--border);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:8px;
+      cursor:pointer;
+    }
+    button.primary {background:linear-gradient(180deg,#007b8f,#006a7a);font-weight:600}
+    .block {
+      background:var(--output-bg);
+      border-radius:8px;
+      padding:12px;
+      border:1px solid var(--border);
+      font-family:ui-monospace,monospace;
+      font-size:13px;
+      color:#cdeffc;
+      white-space:pre-wrap;
+      min-height:200px;
+    }
+    .bad {
+      background:#7d0d0d;
+      color:#fff;
+      border-radius:4px;
+      padding:0 3px;
+    }
+    .segment {
+      border-bottom:1px solid var(--border);
+      padding:6px 0;
+      cursor:pointer;
+    }
+    .collapsed .segment-content {display:none;}
+    .segment-header {
+      color:var(--accent);
+      font-weight:bold;
+      margin-bottom:4px;
+      cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>UTF-8 Invalid Character Detector</h1>
+    <p class="lead">
+      Paste text or XML below. This tool flags any non-ASCII or invalid UTF-8 characters (multi-byte or replacement) as invalid.
+    </p>
+    <textarea id="inputText" placeholder="Paste text or XML here..."></textarea>
+    <div class="row" style="margin-top:10px;">
+      <button class="primary" onclick="detectInvalid()">Detect</button>
+    </div>
+    <div id="output" class="block"></div>
+  </div>
+
+  <script>
+    function detectInvalid() {
+      const text = document.getElementById('inputText').value;
+      const output = document.getElementById('output');
+      output.innerHTML = '';
+
+      const isXML = text.trim().startsWith('<');
+      const encoder = new TextEncoder();
+      const lines = text.split(/\n/);
+      const badSegments = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        let bad = false;
+        let highlighted = '';
+
+        for (const char of line) {
+          const cp = char.codePointAt(0);
+          const bytes = encoder.encode(char);
+          // Invalid if replacement char OR multi-byte (>1 byte)
+          if (cp === 0xFFFD || bytes.length > 1) {
+            bad = true;
+            const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            highlighted += `<span class='bad' title='Invalid (multi-byte or replacement) UTF-8: ${hex}'>${char}</span>`;
+          } else {
+            highlighted += char;
+          }
+        }
+
+        if (bad) {
+          if (isXML) {
+            const segment = extractXMLSegment(text, line);
+            badSegments.push(`<div class='segment'>
+              <div class='segment-header'>XML Segment (click to expand)</div>
+              <div class='segment-content'>${highlightSegment(segment)}</div>
+            </div>`);
+          } else {
+            badSegments.push(`<div class='segment'>
+              <div class='segment-header'>Line ${i + 1} (click to expand)</div>
+              <div class='segment-content'>${highlighted}</div>
+            </div>`);
+          }
+        }
+      }
+
+      output.innerHTML = badSegments.length
+        ? badSegments.join('')
+        : '✅ No invalid (multi-byte or non-UTF-8) characters found.';
+      addToggleBehavior();
+    }
+
+    function extractXMLSegment(text, line) {
+      const idx = text.indexOf(line);
+      if (idx === -1) return line;
+      const before = text.lastIndexOf('<', idx);
+      const after = text.indexOf('>', idx + line.length);
+      if (before !== -1 && after !== -1) {
+        return text.slice(before, after + 1);
+      }
+      return line;
+    }
+
+    function highlightSegment(segment) {
+      const encoder = new TextEncoder();
+      let result = '';
+      for (const char of segment) {
+        const cp = char.codePointAt(0);
+        const bytes = encoder.encode(char);
+        if (cp === 0xFFFD || bytes.length > 1) {
+          const hex = Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join(' ');
+          result += `<span class='bad' title='Invalid UTF-8: ${hex}'>${char}</span>`;
+        } else {
+          result += char;
+        }
+      }
+      return result;
+    }
+
+    function addToggleBehavior() {
+      document.querySelectorAll('.segment-header').forEach(header => {
+        header.addEventListener('click', () => {
+          const parent = header.parentElement;
+          parent.classList.toggle('collapsed');
+        });
+      });
+    }
+  </script>
+</body>
+</html>
