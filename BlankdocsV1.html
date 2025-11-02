@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>BlankDocs v1 - Secure Download</title>
+<style>
+:root{
+  --bg:#071025; --panel:#0b1220; --muted:#94a3b8; --accent:#7dd3fc;
+  --border:rgba(255,255,255,0.08); --text:#e6eef6; --output-bg:#020617;
+}
+html,body{
+  height:100%;margin:0;
+  background:linear-gradient(180deg,var(--bg),#071a2a);
+  color:var(--text);
+  font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
+}
+.wrap{
+  max-width:700px;margin:60px auto;padding:24px;
+  background:var(--panel);
+  border-radius:12px;
+  box-shadow:0 8px 30px rgba(2,6,23,.6);
+  border:1px solid var(--border);
+  box-sizing:border-box;
+}
+h1{margin:0 0 10px;font-size:20px;color:var(--accent)}
+ol{margin:0 0 16px;padding-left:18px;color:var(--muted);font-size:14px;line-height:1.6}
+input[type="password"]{
+  width:100%;
+  padding:12px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background:#031022;
+  color:var(--text);
+  font-family:ui-monospace,monospace;
+  font-size:14px;
+  box-sizing:border-box;
+  margin-top:6px;
+}
+button, a.download-link{
+  display:inline-block;
+  width:100%;
+  padding:12px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  box-sizing:border-box;
+  background:linear-gradient(180deg,#007b8f,#006a7a);
+  color:#fff;
+  font-size:14px;
+  font-weight:600;
+  text-align:center;
+  text-decoration:none;
+  cursor:pointer;
+  margin-top:10px;
+  transition:all .2s ease;
+}
+button:hover, a.download-link:hover{
+  filter:brightness(1.1);
+}
+.note{
+  background:var(--output-bg);
+  padding:12px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  font-size:13px;
+  color:#cdeffc;
+  margin-top:10px;
+  white-space:pre-wrap;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>BlankDocs Automation Prototype V1</h1>
+
+  <h2 style="color:var(--accent);margin-top:12px">Instructions</h2>
+  <ol>
+    <li>Download the file.</li>
+    <li>Put the document in the same folder as <b>CreateBackup.bat</b>.</li>
+    <li>Run <b>CreateBackup.bat</b> — it should create a new folder.</li>
+    <li>Inside the backup folder, run <b>extract_header.bat</b>.</li>
+    <li>Double-check the newly created <b>headers.txt</b>.</li>
+    <li>Run <b>print.bat</b>.</li>
+    <li>Save the file normally and replace the current PDF.</li>
+    <li>Run <b>restore_header.bat</b> to restore the file and check the <b>ChildBackup</b> folder.</li>
+  </ol>
+
+  <label for="password"><b>Enter Password:</b></label><br/>
+  <input id="password" type="password" placeholder="Enter password..." />
+
+  <button id="checkBtn">Verify Password</button>
+
+  <div id="linkArea"></div>
+
+  <div id="status" class="note">🔒 File is locked. Please enter the correct password.</div>
+</div>
+
+<script>
+const storedHash = "6e0499b21e6199e2176bcac92f4a6dae7f23e867d13a87d9aec259b579af294f";
+
+async function sha256(message){
+  const enc = new TextEncoder();
+  const data = enc.encode(message);
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+document.getElementById("checkBtn").addEventListener("click", async ()=>{
+  const raw = document.getElementById("password").value;
+  const normalized = raw.normalize("NFKC").replace(/\s+/g,"");
+  const hash = await sha256(normalized);
+
+  const status = document.getElementById("status");
+  const linkArea = document.getElementById("linkArea");
+  linkArea.innerHTML = "";
+
+  if(hash === storedHash){
+    status.textContent = "✅ Password verified. Download link created below.";
+    status.style.color = "#7dd3fc";
+
+    const a = document.createElement("a");
+    a.href = "BlankDocs v1.zip";
+    a.download = "BlankDocs v1.zip";
+    a.className = "download-link";
+    a.textContent = "⬇️ Download BlankDocs v1.zip";
+    linkArea.appendChild(a);
+
+    a.addEventListener("click", ()=>{
+      status.textContent = "⬇️ Download started.";
+      setTimeout(()=>{ a.remove(); }, 800);
+    });
+  } else {
+    status.textContent = "❌ Incorrect password. Try again.";
+    status.style.color = "#ff5555";
+  }
+});
+</script>
+</body>
+</html>
