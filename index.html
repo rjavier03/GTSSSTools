@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Developer Tools Menu</title>
 <style>
-  :root{
+:root{
     --bg:#071025;
     --panel:#0b1220;
     --muted:#94a3b8;
@@ -13,54 +13,96 @@
     --border: rgba(255,255,255,0.08);
     --text:#e6eef6;
     --output-bg:#020617;
-  }
-  html,body{
-    height:100%;margin:0;
+}
+
+html, body{
+    height:100%;
+    margin:0;
     background:linear-gradient(180deg,var(--bg),#071a2a);
     color:var(--text);
     font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
-    display:flex;align-items:center;justify-content:center;
-  }
-  .wrap{
-    max-width:900px;
-    width:90%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden; /* remove page scroll */
+}
+
+.wrap{
     background:var(--panel);
     border:1px solid var(--border);
     border-radius:16px;
     padding:32px 24px;
     box-shadow:0 8px 30px rgba(2,6,23,.6);
     text-align:center;
-  }
-  h1{
+    display:flex;
+    flex-direction:column;
+    height:90vh;
+    box-sizing:border-box;
+    width:calc(3 * 200px + 2 * 20px + 48px); /* 3 cards + 2 gaps + padding */
+    max-width:100%;
+}
+
+h1{
     margin-top:0;
     font-size:22px;
     color:var(--accent);
-  }
-  p.lead{
+}
+
+p.lead{
     color:var(--muted);
     font-size:14px;
-    margin-bottom:28px;
-  }
-  .menu{
+    margin-bottom:12px;
+    height:28px;
+    line-height:28px;
+    flex-shrink:0;
+    overflow:hidden;
+}
+
+input.search{
+    padding:10px 12px;
+    margin-bottom:20px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:var(--output-bg);
+    color:var(--text);
+    font-size:14px;
+    outline:none;
+}
+
+.menu{
     display:grid;
-    grid-template-columns:repeat(3, 1fr);
+    grid-template-columns:repeat(3, 200px); /* exactly 3 cards per row */
     gap:20px;
-  }
-  @media(max-width:900px){
-    .menu{
-      grid-template-columns:repeat(2, 1fr);
-    }
-  }
-  @media(max-width:600px){
-    .menu{
-      grid-template-columns:1fr;
-    }
-  }
-  a.card{
+    flex:1;
+    overflow-y:auto;
+    overflow-x:hidden;
+    justify-content:center;
+    align-items:start;
+}
+
+/* Scrollbar styling for dark theme */
+.menu::-webkit-scrollbar {
+    width:8px;
+}
+.menu::-webkit-scrollbar-track {
+    background:var(--panel);
+    border-radius:8px;
+}
+.menu::-webkit-scrollbar-thumb {
+    background:var(--accent);
+    border-radius:8px;
+}
+.menu::-webkit-scrollbar-thumb:hover {
+    background:#5ac0e8;
+}
+
+a.card{
     display:flex;
+    flex-direction:column;
     align-items:center;
     justify-content:center;
-    padding:30px 10px;
+    width:200px;
+    min-height:100px;
     background:var(--output-bg);
     border-radius:12px;
     border:1px solid var(--border);
@@ -69,39 +111,64 @@
     font-size:15px;
     text-decoration:none;
     transition:all .25s ease;
-    box-shadow:inset 0 0 0 0 rgba(125,211,252,0.1);
-  }
-  a.card:hover{
+    text-align:center;
+    box-sizing:border-box;
+    padding:10px;
+}
+
+a.card:hover{
     color:var(--accent);
     box-shadow:inset 0 0 20px rgba(125,211,252,0.15),0 0 10px rgba(125,211,252,0.2);
     transform:translateY(-3px);
-  }
-  footer{
-    margin-top:30px;
+}
+
+footer{
+    margin-top:12px;
     color:var(--muted);
     font-size:12px;
-  }
+    flex-shrink:0;
+}
 </style>
 </head>
 <body>
-  <div class="wrap">
+<div class="wrap">
     <h1>Developer Tools</h1>
     <p class="lead">Choose a utility to launch</p>
-    <div class="menu">
-      <a class="card" href="./xmlbeautifier.html">XML Beautifier</a>
-      <a class="card" href="./transactioncount.html">Transaction Count Generator</a>
-      <a class="card" href="./TranslationKeyWordSearch.html">Translation Keyword Search</a>
-      <a class="card" href="./PQSimleRestart.html">Simple PQ Command</a>
-      <a class="card" href="./valueExtractor.html">Field Extract (EDIFact, CSV)</a>
-      <a class="card" href="./RequirementTemplate.html">Requirement Template</a>
-      <a class="card" href="./SpecialCharCode.html">Special Char Code Generator</a>
-      <a class="card" href="./TranslationExport.html">Export Dev Template</a>
-      <a class="card" href="./filerestore.html">Restore File Template</a>
-      <a class="card" href="./invalidcharchecker.html">Invalid Char Checker</a>
-      <a class="card" href="./BlankdocsV1.html">BlankDocs v1</a>
 
+    <!-- Search input -->
+    <input type="text" class="search" id="searchInput" placeholder="Search tools..." oninput="filterCards()">
+
+    <div class="menu" id="menu">
+        <a class="card" href="./xmlbeautifier.html">XML Beautifier</a>
+        <a class="card" href="./transactioncount.html">Transaction Count Generator</a>
+        <a class="card" href="./TranslationKeyWordSearch.html">Translation Keyword Search</a>
+        <a class="card" href="./PQSimleRestart.html">Simple PQ Command</a>
+        <a class="card" href="./valueExtractor.html">Field Extract (EDIFact, CSV)</a>
+        <a class="card" href="./RequirementTemplate.html">Requirement Template</a>
+        <a class="card" href="./SpecialCharCode.html">Special Char Code Generator</a>
+        <a class="card" href="./TranslationExport.html">Export Dev Template</a>
+        <a class="card" href="./filerestore.html">Restore File Template</a>
+        <a class="card" href="./invalidcharchecker.html">Invalid Char Checker</a>
+        <a class="card" href="./BlankdocsV1.html">BlankDocs v1</a>
+        <a class="card" href="./FixField.html">FixField Extract</a>
+        <a class="card" href="./JSONValidator.html">JSON Validator</a>
     </div>
+
     <footer>© 2025 Developer Utilities</footer>
-  </div>
+</div>
+
+<script>
+function filterCards(){
+    const filter = document.getElementById('searchInput').value.toLowerCase();
+    const cards = document.querySelectorAll('.menu .card');
+    cards.forEach(card => {
+        if(card.textContent.toLowerCase().includes(filter)){
+            card.style.display = "flex"; // show matching card
+        } else {
+            card.style.display = "none"; // hide non-matching card
+        }
+    });
+}
+</script>
 </body>
 </html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Offline JSON Validator</title>
+<style>
+:root{
+  --bg:#071025; --panel:#0b1220; --muted:#94a3b8; --accent:#7dd3fc;
+  --border:rgba(255,255,255,0.08); --text:#e6eef6; --output-bg:#020617;
+}
+html,body{
+  height:100%;margin:0;
+  background:linear-gradient(180deg,var(--bg),#071a2a);
+  color:var(--text);
+  font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
+}
+.wrap{
+  max-width:700px;margin:60px auto;padding:24px;
+  background:var(--panel);
+  border-radius:12px;
+  box-shadow:0 8px 30px rgba(2,6,23,.6);
+  border:1px solid var(--border);
+  box-sizing:border-box;
+}
+h1{margin:0 0 10px;font-size:20px;color:var(--accent)}
+textarea{
+  width:100%; padding:10px; margin-bottom:12px;
+  border-radius:6px; border:1px solid var(--border); background:#0b1220; color:var(--text);
+  font-family:monospace; font-size:14px;
+  box-sizing:border-box;
+}
+button{
+  padding:10px 16px; 
+  border:none; 
+  border-radius:6px;
+  color:#fff; 
+  font-weight:600; 
+  cursor:pointer; 
+  margin-top:10px;
+  margin-right:10px;
+  transition:all 0.2s ease;
+  background: linear-gradient(180deg,#006a7a,#007b8f);
+}
+button:hover{
+  filter: brightness(1.15);
+}
+button.clear{
+  background: linear-gradient(180deg,#7d1f6a,#a02f8f);
+}
+#output{
+  background:var(--output-bg);
+  padding:12px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  font-size:13px;
+  color:#cdeffc;
+  margin-top:10px;
+  white-space:pre-wrap;
+  font-family:monospace;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Offline JSON Validator</h1>
+
+  <textarea id="jsonInput" placeholder="Paste your JSON here..." rows="15"></textarea>
+  <div>
+    <button id="validateBtn">Validate JSON</button>
+    <button id="clearBtn" class="clear">Clear</button>
+  </div>
+  <textarea id="output" readonly placeholder="Validation result will appear here..." rows="7"></textarea>
+</div>
+
+<script>
+const jsonInput = document.getElementById('jsonInput');
+const validateBtn = document.getElementById('validateBtn');
+const clearBtn = document.getElementById('clearBtn');
+const output = document.getElementById('output');
+
+validateBtn.addEventListener('click', () => {
+  const text = jsonInput.value;
+  if(!text.trim()){
+    output.value = "Please enter JSON!";
+    return;
+  }
+
+  try {
+    JSON.parse(text);
+    output.value = "✅ Valid JSON!";
+  } catch(e) {
+    // Extract character position from error
+    const match = e.message.match(/position (\d+)/);
+    const pos = match ? parseInt(match[1]) : 0;
+
+    // Map character position to line
+    const lines = text.split(/\r?\n/);
+    let currentPos = 0;
+    let errorLine = 0;
+
+    for(let i = 0; i < lines.length; i++){
+      let lineLength = lines[i].length + 1; // +1 for newline
+      if(pos < currentPos + lineLength){
+        errorLine = i;
+        break;
+      }
+      currentPos += lineLength;
+    }
+
+    const invalidLine = lines[errorLine]; // full line causing error
+
+    // Clean up error message: take only first part before colon or newline
+    const mainError = e.message.split(/:|\n/)[0];
+
+    output.value = `❌ Invalid JSON on line ${errorLine+1}:\n${invalidLine}\n\nError: ${mainError}`;
+  }
+});
+
+// Clear button
+clearBtn.addEventListener('click', () => {
+  jsonInput.value = '';
+  output.value = '';
+});
+</script>
+</body>
+</html>

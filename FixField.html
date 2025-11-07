@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Field Extractor</title>
+<style>
+:root{
+  --bg:#071025; --panel:#0b1220; --muted:#94a3b8; --accent:#7dd3fc;
+  --border:rgba(255,255,255,0.08); --text:#e6eef6; --output-bg:#020617;
+}
+html,body{
+  height:100%;margin:0;
+  background:linear-gradient(180deg,var(--bg),#071a2a);
+  color:var(--text);
+  font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
+}
+.wrap{
+  max-width:700px;margin:60px auto;padding:24px;
+  background:var(--panel);
+  border-radius:12px;
+  box-shadow:0 8px 30px rgba(2,6,23,.6);
+  border:1px solid var(--border);
+  box-sizing:border-box;
+}
+h1{margin:0 0 10px;font-size:20px;color:var(--accent)}
+textarea, input[type="text"], input[type="number"]{
+  width:100%; padding:10px; margin-bottom:12px;
+  border-radius:6px; border:1px solid var(--border); background:#0b1220; color:var(--text);
+  font-family:monospace; font-size:14px;
+  box-sizing:border-box;
+}
+input[type="number"]{
+  width:45%; margin-right:5%;
+  padding:8px;
+  border-radius:6px;
+  border:1px solid var(--border);
+  background:#0b1220;
+  color:var(--text);
+}
+button{
+  padding:10px 16px; 
+  border:none; 
+  border-radius:6px;
+  color:#fff; 
+  font-weight:600; 
+  cursor:pointer; 
+  margin-top:10px;
+  transition:all 0.2s ease;
+  background: linear-gradient(180deg,#006a7a,#007b8f);
+}
+button:hover{
+  filter: brightness(1.15);
+}
+.note{
+  background:var(--output-bg);
+  padding:12px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  font-size:13px;
+  color:#cdeffc;
+  margin-top:10px;
+  white-space:pre-wrap;
+}
+.radio-group{margin-bottom:12px;}
+.mode-fields{margin-bottom:12px;}
+.mode-fields > div{margin-bottom:12px;}
+#output{background:#020617; color:#cdeffc; border:1px solid var(--border);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Field Extractor</h1>
+  
+  <!-- Input TextArea always visible -->
+  <textarea id="inputText" placeholder="Enter your text here..." rows="6"></textarea>
+
+  <!-- Radio buttons -->
+  <div class="radio-group">
+    <label><input type="radio" name="mode" value="manual" checked> Manual</label>
+    <label><input type="radio" name="mode" value="code"> Code</label>
+  </div>
+
+  <!-- Mode-specific fields -->
+  <div class="mode-fields">
+    <div id="manualFields">
+      <input type="text" id="startField" placeholder="Start">
+      <input type="text" id="lengthField" placeholder="Length">
+    </div>
+    <div id="codeFields" style="display:none;">
+      <input type="text" id="codeInput" placeholder='Enter code e.g., String::FixField(anything,0,2)'>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <button id="extractBtn">Extract</button>
+  <button id="copyBtn">Copy</button>
+
+  <!-- Output -->
+  <textarea id="output" readonly placeholder="Output will appear here..." rows="3"></textarea>
+</div>
+
+<script>
+const modeRadios = document.getElementsByName('mode');
+const manualFields = document.getElementById('manualFields');
+const codeFields = document.getElementById('codeFields');
+const inputText = document.getElementById('inputText');
+const startField = document.getElementById('startField');
+const lengthField = document.getElementById('lengthField');
+const codeInput = document.getElementById('codeInput');
+const extractBtn = document.getElementById('extractBtn');
+const copyBtn = document.getElementById('copyBtn');
+const output = document.getElementById('output');
+
+// Switch modes
+function updateMode() {
+  const mode = [...modeRadios].find(r => r.checked).value;
+  if(mode === 'manual'){
+    manualFields.style.display = 'block';
+    codeFields.style.display = 'none';
+  } else {
+    manualFields.style.display = 'none';
+    codeFields.style.display = 'block';
+  }
+}
+[...modeRadios].forEach(r => r.addEventListener('change', updateMode));
+updateMode();
+
+// Extract logic
+extractBtn.addEventListener('click', () => {
+  const text = inputText.value;
+  const mode = [...modeRadios].find(r => r.checked).value;
+  if(!text){
+    output.value = "Please enter text!";
+    return;
+  }
+
+  if(mode === 'manual'){
+    const start = parseInt(startField.value, 10);
+    const length = parseInt(lengthField.value, 10);
+    if(isNaN(start) || isNaN(length)){
+      output.value = "Start and Length must be numbers!";
+      return;
+    }
+    output.value = text.substring(start, start + length);
+  } else {
+    const code = codeInput.value;
+    // Matches: String::FixField(anything, start, length)
+    const regex = /String::FixField\([^,]+,\s*(\d+),\s*(\d+)\)/g;
+    let match;
+    let results = [];
+    while((match = regex.exec(code)) !== null){
+      const start = parseInt(match[1]);
+      const len = parseInt(match[2]);
+      results.push(text.substring(start, start+len));
+    }
+    output.value = results.length ? results.join("\n") : "No valid code found!";
+  }
+});
+
+// Copy button with "Copied" feedback
+copyBtn.addEventListener('click', () => {
+  output.select();
+  document.execCommand('copy');
+  const original = copyBtn.textContent;
+  copyBtn.textContent = "Copied!";
+  setTimeout(() => {
+    copyBtn.textContent = original;
+  }, 1000);
+});
+</script>
+</body>
+</html>
