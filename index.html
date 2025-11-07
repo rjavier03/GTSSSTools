@@ -24,7 +24,7 @@ html, body{
     display:flex;
     align-items:center;
     justify-content:center;
-    overflow:hidden; /* remove page scroll */
+    overflow:hidden;
 }
 
 .wrap{
@@ -38,7 +38,7 @@ html, body{
     flex-direction:column;
     height:90vh;
     box-sizing:border-box;
-    width:calc(3 * 200px + 2 * 20px + 48px); /* 3 cards + 2 gaps + padding */
+    width:calc(3 * 200px + 2 * 20px + 48px);
     max-width:100%;
 }
 
@@ -71,7 +71,7 @@ input.search{
 
 .menu{
     display:grid;
-    grid-template-columns:repeat(3, 200px); /* exactly 3 cards per row */
+    grid-template-columns:repeat(3, 200px);
     gap:20px;
     flex:1;
     overflow-y:auto;
@@ -80,7 +80,6 @@ input.search{
     align-items:start;
 }
 
-/* Scrollbar styling for dark theme */
 .menu::-webkit-scrollbar {
     width:8px;
 }
@@ -110,10 +109,15 @@ a.card{
     font-weight:600;
     font-size:15px;
     text-decoration:none;
-    transition:all .25s ease;
+    transition:transform .25s ease, box-shadow .25s ease;
     text-align:center;
     box-sizing:border-box;
     padding:10px;
+    cursor:grab;
+}
+
+a.card:active {
+    cursor:grabbing;
 }
 
 a.card:hover{
@@ -135,7 +139,6 @@ footer{
     <h1>Developer Tools</h1>
     <p class="lead">Choose a utility to launch</p>
 
-    <!-- Search input -->
     <input type="text" class="search" id="searchInput" placeholder="Search tools..." oninput="filterCards()">
 
     <div class="menu" id="menu">
@@ -158,17 +161,97 @@ footer{
 </div>
 
 <script>
+// ---- FILTER ----
 function filterCards(){
     const filter = document.getElementById('searchInput').value.toLowerCase();
     const cards = document.querySelectorAll('.menu .card');
     cards.forEach(card => {
-        if(card.textContent.toLowerCase().includes(filter)){
-            card.style.display = "flex"; // show matching card
-        } else {
-            card.style.display = "none"; // hide non-matching card
-        }
+        card.style.display = card.textContent.toLowerCase().includes(filter) ? "flex" : "none";
     });
 }
+
+// ---- DRAG + ANIMATED REORDER ----
+const menu = document.getElementById('menu');
+let draggedEl = null;
+
+// Load saved order
+document.addEventListener("DOMContentLoaded", () => {
+    const savedOrder = JSON.parse(localStorage.getItem("cardOrder"));
+    if (savedOrder) {
+        const cards = Array.from(menu.children);
+        savedOrder.forEach(href => {
+            const card = cards.find(c => c.getAttribute("href") === href);
+            if (card) menu.appendChild(card);
+        });
+    }
+    document.querySelectorAll('.card').forEach(c => c.setAttribute('draggable', 'true'));
+});
+
+// FLIP animation utility
+function animateReorder(oldPositions, newPositions){
+    for (const el of newPositions.keys()) {
+        const oldRect = oldPositions.get(el);
+        const newRect = newPositions.get(el);
+        if (!oldRect || !newRect) continue;
+        const dx = oldRect.left - newRect.left;
+        const dy = oldRect.top - newRect.top;
+        if (dx || dy) {
+            el.style.transform = `translate(${dx}px, ${dy}px)`;
+            requestAnimationFrame(() => {
+                el.style.transition = 'transform 300ms ease';
+                el.style.transform = '';
+            });
+            el.addEventListener('transitionend', () => el.style.transition = '', { once: true });
+        }
+    }
+}
+
+menu.addEventListener('dragstart', e => {
+    if (e.target.classList.contains('card')) {
+        draggedEl = e.target;
+        e.dataTransfer.effectAllowed = 'move';
+        e.target.style.opacity = '0.4';
+    }
+});
+
+menu.addEventListener('dragend', e => {
+    e.target.style.opacity = '1';
+    draggedEl = null;
+});
+
+menu.addEventListener('dragover', e => {
+    e.preventDefault();
+    const afterElement = getDragAfterElement(menu, e.clientY);
+    const oldPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
+    if (afterElement == null) {
+        menu.appendChild(draggedEl);
+    } else {
+        menu.insertBefore(draggedEl, afterElement);
+    }
+    const newPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
+    animateReorder(oldPositions, newPositions);
+});
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.card:not([style*="opacity: 0.4"])')];
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+// Save new order
+window.addEventListener('mouseup', () => {
+    if (!draggedEl) {
+        const order = Array.from(menu.children).map(c => c.getAttribute('href'));
+        localStorage.setItem('cardOrder', JSON.stringify(order));
+    }
+});
 </script>
 </body>
 </html>
