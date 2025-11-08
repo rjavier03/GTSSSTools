@@ -5,253 +5,275 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Developer Tools Menu</title>
 <style>
-:root{
-    --bg:#071025;
-    --panel:#0b1220;
-    --muted:#94a3b8;
-    --accent:#7dd3fc;
-    --border: rgba(255,255,255,0.08);
-    --text:#e6eef6;
-    --output-bg:#020617;
+:root {
+  --bg:#071025;
+  --panel:#0b1220;
+  --muted:#94a3b8;
+  --accent:#7dd3fc;
+  --border: rgba(255,255,255,0.08);
+  --text:#e6eef6;
+  --output-bg:#020617;
 }
 
-html, body{
-    height:100%;
-    margin:0;
-    background:linear-gradient(180deg,var(--bg),#071a2a);
-    color:var(--text);
-    font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    overflow:hidden;
+html, body {
+  height:100%;
+  margin:0;
+  background:linear-gradient(180deg,var(--bg),#071a2a);
+  color:var(--text);
+  font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
 }
 
-.wrap{
-    background:var(--panel);
-    border:1px solid var(--border);
-    border-radius:16px;
-    padding:32px 24px;
-    box-shadow:0 8px 30px rgba(2,6,23,.6);
-    text-align:center;
-    display:flex;
-    flex-direction:column;
-    height:90vh;
-    box-sizing:border-box;
-    width:calc(3 * 200px + 2 * 20px + 48px);
-    max-width:100%;
+.wrap {
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:32px 24px;
+  box-shadow:0 8px 30px rgba(2,6,23,.6);
+  text-align:center;
+  display:flex;
+  flex-direction:column;
+  height:90vh;
+  box-sizing:border-box;
+  width:calc(3 * 200px + 2 * 20px + 48px);
+  max-width:100%;
 }
 
-h1{
-    margin-top:0;
-    font-size:22px;
-    color:var(--accent);
+h1 {
+  margin-top:0;
+  font-size:22px;
+  color:var(--accent);
 }
 
-p.lead{
-    color:var(--muted);
-    font-size:14px;
-    margin-bottom:12px;
-    height:28px;
-    line-height:28px;
-    flex-shrink:0;
-    overflow:hidden;
+p.lead {
+  color:var(--muted);
+  font-size:14px;
+  margin-bottom:12px;
+  height:28px;
+  line-height:28px;
+  flex-shrink:0;
+  overflow:hidden;
 }
 
-input.search{
-    padding:10px 12px;
-    margin-bottom:20px;
-    border-radius:8px;
-    border:1px solid var(--border);
-    background:var(--output-bg);
-    color:var(--text);
-    font-size:14px;
-    outline:none;
+input.search {
+  padding:10px 12px;
+  margin-bottom:20px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background:var(--output-bg);
+  color:var(--text);
+  font-size:14px;
+  outline:none;
 }
 
-.menu{
-    display:grid;
-    grid-template-columns:repeat(3, 200px);
-    gap:20px;
-    flex:1;
-    overflow-y:auto;
-    overflow-x:hidden;
-    justify-content:center;
-    align-items:start;
+.menu {
+  display:grid;
+  grid-template-columns:repeat(3, 200px);
+  gap:20px;
+  flex:1;
+  overflow-y:auto;
+  overflow-x:hidden;
+  justify-content:center;
+  align-items:start;
 }
 
 .menu::-webkit-scrollbar {
-    width:8px;
-}
-.menu::-webkit-scrollbar-track {
-    background:var(--panel);
-    border-radius:8px;
+  width:8px;
 }
 .menu::-webkit-scrollbar-thumb {
-    background:var(--accent);
-    border-radius:8px;
+  background:var(--accent);
+  border-radius:8px;
 }
 .menu::-webkit-scrollbar-thumb:hover {
-    background:#5ac0e8;
+  background:#5ac0e8;
 }
 
-a.card{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    width:200px;
-    min-height:100px;
-    background:var(--output-bg);
-    border-radius:12px;
-    border:1px solid var(--border);
-    color:var(--text);
-    font-weight:600;
-    font-size:15px;
-    text-decoration:none;
-    transition:transform .25s ease, box-shadow .25s ease;
-    text-align:center;
-    box-sizing:border-box;
-    padding:10px;
-    cursor:grab;
+a.card {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  width:200px;
+  min-height:100px;
+  background:var(--output-bg);
+  border-radius:12px;
+  border:1px solid var(--border);
+  color:var(--text);
+  font-weight:600;
+  font-size:15px;
+  text-decoration:none;
+  transition:transform .25s ease, box-shadow .25s ease;
+  text-align:center;
+  box-sizing:border-box;
+  padding:10px;
+  cursor:grab;
+  will-change: transform;
+  user-select:none;
 }
 
-a.card:active {
-    cursor:grabbing;
+a.card:hover {
+  color:var(--accent);
+  box-shadow:inset 0 0 20px rgba(125,211,252,0.15),0 0 10px rgba(125,211,252,0.2);
+  transform:translateY(-3px);
 }
 
-a.card:hover{
-    color:var(--accent);
-    box-shadow:inset 0 0 20px rgba(125,211,252,0.15),0 0 10px rgba(125,211,252,0.2);
-    transform:translateY(-3px);
+a.card.dragging {
+  opacity: 0.2;
+  cursor:grabbing;
 }
 
-footer{
-    margin-top:12px;
-    color:var(--muted);
-    font-size:12px;
-    flex-shrink:0;
+footer {
+  margin-top:12px;
+  color:var(--muted);
+  font-size:12px;
+  flex-shrink:0;
+}
+
+/* floating ghost preview */
+.drag-ghost {
+  position: fixed;
+  pointer-events:none;
+  z-index:10000;
+  transform:translate(-50%, -50%) scale(1.05);
+  opacity:0.8;
+  transition:transform 0.1s ease;
 }
 </style>
 </head>
 <body>
 <div class="wrap">
-    <h1>Developer Tools</h1>
-    <p class="lead">Choose a utility to launch</p>
+  <h1>Developer Tools</h1>
+  <p class="lead">Choose a utility to launch</p>
 
-    <input type="text" class="search" id="searchInput" placeholder="Search tools..." oninput="filterCards()">
+  <input type="text" class="search" id="searchInput" placeholder="Search tools..." oninput="filterCards()">
 
-    <div class="menu" id="menu">
-        <a class="card" href="./xmlbeautifier.html">XML Beautifier</a>
-        <a class="card" href="./transactioncount.html">Transaction Count Generator</a>
-        <a class="card" href="./TranslationKeyWordSearch.html">Translation Keyword Search</a>
-        <a class="card" href="./PQSimleRestart.html">Simple PQ Command</a>
-        <a class="card" href="./valueExtractor.html">Field Extract (EDIFact, CSV)</a>
-        <a class="card" href="./RequirementTemplate.html">Requirement Template</a>
-        <a class="card" href="./SpecialCharCode.html">Special Char Code Generator</a>
-        <a class="card" href="./TranslationExport.html">Export Dev Template</a>
-        <a class="card" href="./filerestore.html">Restore File Template</a>
-        <a class="card" href="./invalidcharchecker.html">Invalid Char Checker</a>
-        <a class="card" href="./BlankdocsV1.html">BlankDocs v1</a>
-        <a class="card" href="./FixField.html">FixField Extract</a>
-        <a class="card" href="./JSONValidator.html">JSON Validator</a>
-    </div>
+  <div class="menu" id="menu">
+    <a class="card" href="./xmlbeautifier.html">XML Beautifier</a>
+    <a class="card" href="./transactioncount.html">Transaction Count Generator</a>
+    <a class="card" href="./TranslationKeyWordSearch.html">Translation Keyword Search</a>
+    <a class="card" href="./PQSimleRestart.html">Simple PQ Command</a>
+    <a class="card" href="./valueExtractor.html">Field Extract (EDIFact, CSV)</a>
+    <a class="card" href="./RequirementTemplate.html">Requirement Template</a>
+    <a class="card" href="./SpecialCharCode.html">Special Char Code Generator</a>
+    <a class="card" href="./TranslationExport.html">Export Dev Template</a>
+    <a class="card" href="./filerestore.html">Restore File Template</a>
+    <a class="card" href="./invalidcharchecker.html">Invalid Char Checker</a>
+    <a class="card" href="./BlankdocsV1.html">BlankDocs v1</a>
+    <a class="card" href="./FixField.html">FixField Extract</a>
+    <a class="card" href="./JSONValidator.html">JSON Validator</a>
+  </div>
 
-    <footer>© 2025 Developer Utilities</footer>
+  <footer>© 2025 Developer Utilities</footer>
 </div>
 
 <script>
 // ---- FILTER ----
-function filterCards(){
-    const filter = document.getElementById('searchInput').value.toLowerCase();
-    const cards = document.querySelectorAll('.menu .card');
-    cards.forEach(card => {
-        card.style.display = card.textContent.toLowerCase().includes(filter) ? "flex" : "none";
-    });
+function filterCards() {
+  const filter = document.getElementById('searchInput').value.toLowerCase();
+  const cards = document.querySelectorAll('.menu .card');
+  cards.forEach(card => {
+    card.style.display = card.textContent.toLowerCase().includes(filter) ? "flex" : "none";
+  });
 }
 
-// ---- DRAG + ANIMATED REORDER ----
+// ---- DRAG + FULL GRID FLIP ANIMATION + GHOST ----
 const menu = document.getElementById('menu');
 let draggedEl = null;
+let ghost = null;
 
-// Load saved order
+// Restore saved order
 document.addEventListener("DOMContentLoaded", () => {
-    const savedOrder = JSON.parse(localStorage.getItem("cardOrder"));
-    if (savedOrder) {
-        const cards = Array.from(menu.children);
-        savedOrder.forEach(href => {
-            const card = cards.find(c => c.getAttribute("href") === href);
-            if (card) menu.appendChild(card);
-        });
-    }
-    document.querySelectorAll('.card').forEach(c => c.setAttribute('draggable', 'true'));
+  const savedOrder = JSON.parse(localStorage.getItem("cardOrder"));
+  if (savedOrder) {
+    const cards = Array.from(menu.children);
+    savedOrder.forEach(href => {
+      const card = cards.find(c => c.getAttribute("href") === href);
+      if (card) menu.appendChild(card);
+    });
+  }
+  document.querySelectorAll('.card').forEach(c => c.setAttribute('draggable', 'true'));
 });
 
-// FLIP animation utility
-function animateReorder(oldPositions, newPositions){
-    for (const el of newPositions.keys()) {
-        const oldRect = oldPositions.get(el);
-        const newRect = newPositions.get(el);
-        if (!oldRect || !newRect) continue;
-        const dx = oldRect.left - newRect.left;
-        const dy = oldRect.top - newRect.top;
-        if (dx || dy) {
-            el.style.transform = `translate(${dx}px, ${dy}px)`;
-            requestAnimationFrame(() => {
-                el.style.transition = 'transform 300ms ease';
-                el.style.transform = '';
-            });
-            el.addEventListener('transitionend', () => el.style.transition = '', { once: true });
-        }
-    }
-}
-
 menu.addEventListener('dragstart', e => {
-    if (e.target.classList.contains('card')) {
-        draggedEl = e.target;
-        e.dataTransfer.effectAllowed = 'move';
-        e.target.style.opacity = '0.4';
-    }
+  if (!e.target.classList.contains('card')) return;
+  draggedEl = e.target;
+  draggedEl.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setDragImage(new Image(), 0, 0); // hide default ghost
+
+  // Create ghost preview
+  ghost = draggedEl.cloneNode(true);
+  ghost.classList.add('drag-ghost');
+  document.body.appendChild(ghost);
+});
+
+menu.addEventListener('drag', e => {
+  if (ghost && e.clientX && e.clientY) {
+    ghost.style.left = e.clientX + 'px';
+    ghost.style.top = e.clientY + 'px';
+  }
 });
 
 menu.addEventListener('dragend', e => {
-    e.target.style.opacity = '1';
-    draggedEl = null;
+  if (ghost) ghost.remove();
+  if (draggedEl) draggedEl.classList.remove('dragging');
+  draggedEl = null;
+  ghost = null;
+  saveOrder();
 });
 
 menu.addEventListener('dragover', e => {
-    e.preventDefault();
-    const afterElement = getDragAfterElement(menu, e.clientY);
-    const oldPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
-    if (afterElement == null) {
-        menu.appendChild(draggedEl);
-    } else {
-        menu.insertBefore(draggedEl, afterElement);
-    }
-    const newPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
-    animateReorder(oldPositions, newPositions);
+  e.preventDefault();
+  if (!draggedEl) return;
+
+  const oldPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
+  const afterElement = getDragAfterElement(menu, e.clientX, e.clientY);
+
+  if (afterElement == null) menu.appendChild(draggedEl);
+  else menu.insertBefore(draggedEl, afterElement);
+
+  const newPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
+  animateAll(oldPositions, newPositions);
 });
 
-function getDragAfterElement(container, y) {
-    const draggableElements = [...container.querySelectorAll('.card:not([style*="opacity: 0.4"])')];
-    return draggableElements.reduce((closest, child) => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closest.offset) {
-            return { offset: offset, element: child };
-        } else {
-            return closest;
-        }
-    }, { offset: Number.NEGATIVE_INFINITY }).element;
+function getDragAfterElement(container, x, y) {
+  const cards = [...container.querySelectorAll('.card:not(.dragging)')];
+  let closest = { distance: Number.POSITIVE_INFINITY, element: null };
+  cards.forEach(card => {
+    const rect = card.getBoundingClientRect();
+    const dx = x - (rect.left + rect.width / 2);
+    const dy = y - (rect.top + rect.height / 2);
+    const dist = Math.hypot(dx, dy);
+    if (dist < closest.distance) closest = { distance: dist, element: card };
+  });
+  return closest.element;
 }
 
-// Save new order
-window.addEventListener('mouseup', () => {
-    if (!draggedEl) {
-        const order = Array.from(menu.children).map(c => c.getAttribute('href'));
-        localStorage.setItem('cardOrder', JSON.stringify(order));
+function animateAll(oldPos, newPos) {
+  for (const [el, oldRect] of oldPos.entries()) {
+    const newRect = newPos.get(el);
+    if (!newRect) continue;
+    const dx = oldRect.left - newRect.left;
+    const dy = oldRect.top - newRect.top;
+    if (dx || dy) {
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      el.style.transition = 'transform 0s';
+      requestAnimationFrame(() => {
+        el.style.transition = 'transform 250ms ease';
+        el.style.transform = '';
+      });
+      el.addEventListener('transitionend', () => el.style.transition = '', { once: true });
     }
-});
+  }
+}
+
+function saveOrder() {
+  const order = Array.from(menu.children).map(c => c.getAttribute('href'));
+  localStorage.setItem('cardOrder', JSON.stringify(order));
+}
 </script>
 </body>
 </html>
