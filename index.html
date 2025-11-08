@@ -105,7 +105,7 @@ a.card {
   font-weight:600;
   font-size:15px;
   text-decoration:none;
-  transition:transform .25s ease, box-shadow .25s ease;
+  transition:transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.3s ease;
   text-align:center;
   box-sizing:border-box;
   padding:10px;
@@ -138,8 +138,8 @@ footer {
   pointer-events:none;
   z-index:10000;
   transform:translate(-50%, -50%) scale(1.05);
-  opacity:0.8;
-  transition:transform 0.1s ease;
+  opacity:0.85;
+  transition:transform 0.2s ease-out, left 0.08s linear, top 0.08s linear;
 }
 </style>
 </head>
@@ -170,21 +170,12 @@ footer {
 </div>
 
 <script>
-// ---- FILTER ----
-function filterCards() {
-  const filter = document.getElementById('searchInput').value.toLowerCase();
-  const cards = document.querySelectorAll('.menu .card');
-  cards.forEach(card => {
-    card.style.display = card.textContent.toLowerCase().includes(filter) ? "flex" : "none";
-  });
-}
-
-// ---- DRAG + FULL GRID FLIP ANIMATION + GHOST ----
 const menu = document.getElementById('menu');
 let draggedEl = null;
 let ghost = null;
+let currentTarget = null;
 
-// Restore saved order
+// ---- Restore saved order ----
 document.addEventListener("DOMContentLoaded", () => {
   const savedOrder = JSON.parse(localStorage.getItem("cardOrder"));
   if (savedOrder) {
@@ -197,19 +188,20 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll('.card').forEach(c => c.setAttribute('draggable', 'true'));
 });
 
+// ---- DRAG START ----
 menu.addEventListener('dragstart', e => {
   if (!e.target.classList.contains('card')) return;
   draggedEl = e.target;
   draggedEl.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setDragImage(new Image(), 0, 0); // hide default ghost
+  e.dataTransfer.setDragImage(new Image(), 0, 0);
 
-  // Create ghost preview
   ghost = draggedEl.cloneNode(true);
   ghost.classList.add('drag-ghost');
   document.body.appendChild(ghost);
 });
 
+// ---- DRAG MOVE ----
 menu.addEventListener('drag', e => {
   if (ghost && e.clientX && e.clientY) {
     ghost.style.left = e.clientX + 'px';
@@ -217,41 +209,60 @@ menu.addEventListener('drag', e => {
   }
 });
 
-menu.addEventListener('dragend', e => {
+// ---- DRAG END ----
+menu.addEventListener('dragend', () => {
   if (ghost) ghost.remove();
   if (draggedEl) draggedEl.classList.remove('dragging');
   draggedEl = null;
-  ghost = null;
+  currentTarget = null;
   saveOrder();
 });
 
+// ---- DRAG OVER ----
 menu.addEventListener('dragover', e => {
   e.preventDefault();
   if (!draggedEl) return;
 
-  const oldPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
-  const afterElement = getDragAfterElement(menu, e.clientX, e.clientY);
+  const after = getClosestCard(menu, e.clientX, e.clientY);
+  if (after && after !== currentTarget) {
+    currentTarget = after;
 
-  if (afterElement == null) menu.appendChild(draggedEl);
-  else menu.insertBefore(draggedEl, afterElement);
-
-  const newPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
-  animateAll(oldPositions, newPositions);
+    const oldPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
+    menu.insertBefore(draggedEl, after);
+    const newPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
+    animateAll(oldPositions, newPositions);
+  } else if (!after && menu.lastElementChild !== draggedEl) {
+    const oldPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
+    menu.appendChild(draggedEl);
+    const newPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
+    animateAll(oldPositions, newPositions);
+  }
 });
 
-function getDragAfterElement(container, x, y) {
+// ---- Get nearest card ----
+function getClosestCard(container, x, y) {
   const cards = [...container.querySelectorAll('.card:not(.dragging)')];
-  let closest = { distance: Number.POSITIVE_INFINITY, element: null };
-  cards.forEach(card => {
+  let closest = null;
+  let minDist = Infinity;
+  for (const card of cards) {
     const rect = card.getBoundingClientRect();
-    const dx = x - (rect.left + rect.width / 2);
-    const dy = y - (rect.top + rect.height / 2);
-    const dist = Math.hypot(dx, dy);
-    if (dist < closest.distance) closest = { distance: dist, element: card };
-  });
-  return closest.element;
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dist = Math.hypot(x - cx, y - cy);
+    if (dist < minDist) {
+      minDist = dist;
+      closest = card;
+    }
+  }
+  if (closest) {
+    const r = closest.getBoundingClientRect();
+    if (x > r.left && x < r.right && y > r.top && y < r.bottom)
+      return closest;
+  }
+  return null;
 }
 
+// ---- Smooth FLIP animation ----
 function animateAll(oldPos, newPos) {
   for (const [el, oldRect] of oldPos.entries()) {
     const newRect = newPos.get(el);
@@ -262,17 +273,26 @@ function animateAll(oldPos, newPos) {
       el.style.transform = `translate(${dx}px, ${dy}px)`;
       el.style.transition = 'transform 0s';
       requestAnimationFrame(() => {
-        el.style.transition = 'transform 250ms ease';
+        el.style.transition = 'transform 0.5s cubic-bezier(0.25, 1, 0.5, 1)';
         el.style.transform = '';
       });
-      el.addEventListener('transitionend', () => el.style.transition = '', { once: true });
     }
   }
 }
 
+// ---- Save order ----
 function saveOrder() {
   const order = Array.from(menu.children).map(c => c.getAttribute('href'));
   localStorage.setItem('cardOrder', JSON.stringify(order));
+}
+
+// ---- Search ----
+function filterCards() {
+  const filter = document.getElementById('searchInput').value.toLowerCase();
+  const cards = document.querySelectorAll('.menu .card');
+  cards.forEach(card => {
+    card.style.display = card.textContent.toLowerCase().includes(filter) ? "flex" : "none";
+  });
 }
 </script>
 </body>
