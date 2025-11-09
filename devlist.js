@@ -53,6 +53,7 @@ const devNames=[
     "hersheykyla.yap",
     "hilari.permatadewi",
     "huixin.wong",
+    "ian.deguzman",
     "ianrafael.butiong",
     "imtiyaz.suhaimi",
     "irish.rubia",
@@ -176,3 +177,4 @@ const devNames=[
     "zafeer.hyder"
     
 ];
+
