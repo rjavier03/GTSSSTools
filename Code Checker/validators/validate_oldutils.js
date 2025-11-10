@@ -3,13 +3,13 @@ window.validators.push(function validate_oldutils(lines, raw, issues) {
     const utilsMap = [
         { old: /YB_V2Util::takeField/, new: "String::TakeField" },
         { old: /YB_V2TransUtil::isBeginWith/, new: "String::IsBeginWith" },
-        { old: /YB_V2TransUtil::fixField(?=_Old)?/, new: "String::FixField" },
+        { old: /YB_V2TransUtil::fixField(?=_Old)?/, new: "String::FixField" }, // includes fixField_Old now
         { old: /YB_V2TransUtil::trimString/, new: "String::Trim" },
         { old: /YB_V2TransUtil::replaceChar/, new: "String::ReplaceChar" },
         { old: /YB_V2Util::removeChar/, new: "String::RemoveChar" },
         { old: /YB_V2TransUtil::toString/, new: "String::ToString" },
-        { old: /YB_V2TransUtil::countField/, new: "String::CountField" },
-        { old: /YB_V2TransUtil::formatFloatNumber/, new: "Number::FormatDouble" },
+        { old: /YB_V2TransUtil::countField/, new: "String::CountField" }, // now normal rule
+        { old: /YB_V2TransUtil::formatFloatNumber/, new: "Number::FormatDouble" }, // special skip logic below
         { old: /YB_V2TransUtil::strpad/, new: "String::PadString" },
         { old: /stricmp/, new: 'strcmp(String::ToUpper(a), String::ToUpper(b))' },
         { old: /YB_V2TransUtil::htmlEncode/, new: "String::BasicXmlEncode" },
@@ -21,61 +21,44 @@ window.validators.push(function validate_oldutils(lines, raw, issues) {
         { old: /YB_V2TransUtil::toUpper/, new: "String::ToUpper" },
     ];
 
+    // ✅ Only formatFloatNumber keeps special condition
     const specialCases = [
         {
-            name: "fixField_Old",
-            regex: /YB_V2TransUtil::fixField_Old\(([^,]+),\s*(\d+),\s*(\d+)\)/,
-            handler: (str, start, len) => {
-                const newStart = parseInt(start, 10) - 1;
-                return `String::FixField(${str}, ${newStart}, ${len})`;
-            },
-            detail: "Second parameter must be minus 1 for new FixField"
-        },
-        {
-            name: "countField",
-            regex: /YB_V2TransUtil::countField\(([^,]+),\s*([^\)]+)\)/,
-            handler: (str, delimiter) => `String::CountField(${str}, ${delimiter})`,
-            detail: "Check special case: if storeNum == 1 instead of 0"
-        },
-        {
             name: "formatFloatNumber",
-            regex: /YB_V2TransUtil::formatFloatNumber\(([^,]+),\s*([0-9]+)\)/,
-            handler: (varName, precision) => {
-                if (precision !== "0") {
-                    return `Number::FormatDouble(${varName}, ${precision})`;
-                } else {
-                    return null; // keep as-is
+            regex: /YB_V2TransUtil::formatFloatNumber\((.+?),\s*([0-9]+)\)/,
+            handler: (param1, precision) => {
+                if (precision.trim() === "0") {
+                    return null; // skip if precision = 0
                 }
+                return `Number::FormatDouble(${param1.trim()}, ${precision.trim()})`;
             },
             detail: "Only convert to Number::FormatDouble if precision != 0"
-        },
-        {
-            name: "strpad",
-            regex: /YB_V2TransUtil::strpad\(([^,]+),\s*([0-9]+)\)/,
-            handler: (str, len) => `String::PadString(${str}, ' ', ${len}, String::PADRIGHT)`,
-            detail: "Convert strpad to PadString (default PADRIGHT)"
         },
     ];
 
     for (let i = 0; i < lines.length; i++) {
-        let line = lines[i];
+        const line = lines[i];
 
-        // Check special cases first
+        // 1️⃣ Handle special case (formatFloatNumber only)
         specialCases.forEach(sc => {
             const m = line.match(sc.regex);
             if (m) {
                 const suggestion = sc.handler(...m.slice(1));
-                issues.push({
-                    type: `old utility - ${sc.name}`,
-                    line: i + 1,
-                    snippet: line.trim(),
-                    detail: suggestion ? `${sc.detail}. Suggestion: ${suggestion}` : sc.detail
-                });
+                if (suggestion) {
+                    issues.push({
+                        type: `old utility - ${sc.name}`,
+                        line: i + 1,
+                        snippet: line.trim(),
+                        detail: `${sc.detail}. Suggestion: ${suggestion}`
+                    });
+                }
             }
         });
 
-        // Then general mappings
+        // 2️⃣ Handle general mappings (skip formatFloatNumber because it's already processed)
         utilsMap.forEach(util => {
+            if (util.old.source.includes("formatFloatNumber")) return;
+
             if (util.old.test(line)) {
                 issues.push({
                     type: "old utility",
