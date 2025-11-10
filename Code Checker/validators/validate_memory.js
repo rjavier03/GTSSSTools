@@ -3,6 +3,8 @@ window.validators.push(function validate_memory(lines, raw, issues, ctx) {
     let currentFunc = null;
     let blockStack = [];
     let pendingControl = false;
+    const destructorDeletes = []; // store objects deleted in destructor
+    let inDestructor = false;
 
     function stripLineComment(s) {
         const idx = s.indexOf('//');
@@ -17,8 +19,37 @@ window.validators.push(function validate_memory(lines, raw, issues, ctx) {
         let rawLine = lines[i];
         let ln = stripLineComment(rawLine).trim();
 
-        if (/\b(if|else if|for|while|switch)\b/.test(ln)) pendingControl = true;
+        // Check for destructor start
+        const destructorMatch = ln.match(/\bTranslation::~Translation\s*\(\s*\)/);
+        if (destructorMatch) {
+            inDestructor = true;
+            blockStack = [];
+            pendingControl = false;
+            continue;
+        }
 
+        // Track braces for destructor
+        if (inDestructor) {
+            for (let pos = 0; pos < ln.length; pos++) {
+                const ch = ln[pos];
+                if (ch === '{') blockStack.push({ idx: i });
+                else if (ch === '}') {
+                    if (blockStack.length > 0) blockStack.pop();
+                    if (blockStack.length === 0) inDestructor = false; // destructor ended
+                }
+            }
+
+            // Detect deletes inside destructor
+            const delMatch = ln.match(/\bdelete(\s*\[\])?\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/);
+            if (delMatch) {
+                const name = delMatch[2];
+                if (!destructorDeletes.includes(name)) destructorDeletes.push(name);
+                console.log(`Destructor deletes object: ${name} at line ${i + 1}`);
+            }
+            continue;
+        }
+
+        // --- Existing function detection ---
         const funcMatch = ln.match(/\b(?:bool|int|void|double|float|string)\s+Translation::([A-Za-z_][A-Za-z0-9_]*)\s*\(/);
         if (funcMatch) {
             if (currentFunc) currentFunc.endLine = i;
@@ -67,21 +98,31 @@ window.validators.push(function validate_memory(lines, raw, issues, ctx) {
         }
 
         // --- Detect deletes ---
+      // --- Detect deletes ---
         const delMatch = ln.match(/\bdelete(\s*\[\])?\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/);
         if (delMatch) {
             const name = delMatch[2];
             currentFunc.deletes.push({ name, line: i + 1 });
 
-            // Check if delete is permanent (not followed by return within 5 lines)
+            // Check if delete is permanent
             let permanent = true;
-            let returnObjects = [];
-            for (let j = i; j < Math.min(lines.length, i + 6); j++) {
-                const retMatch = lines[j].match(/\breturn\s+(EXIT_FAILURE|false|true)\b/);
+            for (let j = i + 1; j < Math.min(lines.length, i + 10); j++) {
+                const nextLine = stripLineComment(lines[j]).trim();
+                if (nextLine.length === 0) continue; // skip empty lines
+
+                // If next line is another delete, keep checking
+                const nextDel = nextLine.match(/\bdelete(\s*\[\])?\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/);
+                if (nextDel) continue;
+
+                // If next line is a return, then not permanent
+                const retMatch = nextLine.match(/\breturn\s+(EXIT_FAILURE|EXIT_SUCCESS|true|false)\b/);
                 if (retMatch) {
                     permanent = false;
-                    returnObjects.push(name);
                     break;
                 }
+
+                // Any other line -> delete is permanent
+                break;
             }
 
             if (permanent) {
@@ -95,6 +136,7 @@ window.validators.push(function validate_memory(lines, raw, issues, ctx) {
             }
         }
 
+
         // --- Detect returns ---
         const retMatch = ln.match(/\breturn\s+(EXIT_SUCCESS|EXIT_FAILURE|true|false)\s*;/);
         if (retMatch) {
@@ -107,31 +149,28 @@ window.validators.push(function validate_memory(lines, raw, issues, ctx) {
                 if (dMatch) deletedObjects.push(dMatch[2]);
             }
 
-            // Ignore objects inside their own isError() check
             const ignoredObjects = [];
             for (let obj of currentFunc.objects) {
+                // skip if deleted in destructor
+                if (destructorDeletes.includes(obj)) continue;
+
                 for (let lookBack = Math.max(0, i - 5); lookBack <= i; lookBack++) {
                     const errorCheck = lines[lookBack].match(new RegExp(obj + "->isError\\s*\\(\\)"));
                     if (errorCheck) ignoredObjects.push(obj);
                 }
             }
 
-            // Flag objects still in array that were not deleted
             currentFunc.objects.forEach(objName => {
-                if (!deletedObjects.includes(objName) && !ignoredObjects.includes(objName)) {
+                if (!deletedObjects.includes(objName) && !ignoredObjects.includes(objName) && !destructorDeletes.includes(objName)) {
                     console.warn(`Object ${objName} allocated before line ${i + 1} is not deleted before return ${retType}`);
                     issues.push({
                         type: "Missing delete before return",
                         line: i + 1,
                         snippet: ln,
-                        detail: `Object "${objName}" allocated in function "${currentFunc.name}" is not deleted before return '${retType}'.`
+                        detail: `Object "${objName}" allocated in function "${currentFunc.name}" is not deleted before return '${retType}', nor in destructor.`
                     });
                 }
             });
-
-            const deleteStr = deletedObjects.length ? ` [delete ${deletedObjects.join(', ')}]` : '';
-            console.log(`Return ${retType} at line ${i + 1}${deleteStr}`);
-            logObjects('Current Object', currentFunc.objects);
         }
 
         // catch(...) considered EXIT_FAILURE
@@ -144,6 +183,8 @@ window.validators.push(function validate_memory(lines, raw, issues, ctx) {
 
             const ignoredObjects = [];
             for (let obj of currentFunc.objects) {
+                if (destructorDeletes.includes(obj)) continue;
+
                 for (let lookBack = Math.max(0, i - 5); lookBack <= i; lookBack++) {
                     const errorCheck = lines[lookBack].match(new RegExp(obj + "->isError\\s*\\(\\)"));
                     if (errorCheck) ignoredObjects.push(obj);
@@ -151,20 +192,18 @@ window.validators.push(function validate_memory(lines, raw, issues, ctx) {
             }
 
             currentFunc.objects.forEach(objName => {
-                if (!deletedObjects.includes(objName) && !ignoredObjects.includes(objName)) {
+                if (!deletedObjects.includes(objName) && !ignoredObjects.includes(objName) && !destructorDeletes.includes(objName)) {
                     console.warn(`Object ${objName} allocated before line ${i + 1} is not deleted before catch`);
                     issues.push({
                         type: "Missing delete before catch",
                         line: i + 1,
                         snippet: ln,
-                        detail: `Object "${objName}" allocated in function "${currentFunc.name}" is not deleted before catch.`
+                        detail: `Object "${objName}" allocated in function "${currentFunc.name}" is not deleted before catch, nor in destructor.`
                     });
                 }
             });
-
-            const deleteStr = deletedObjects.length ? ` [delete ${deletedObjects.join(', ')}]` : '';
-            console.log(`Return catch at line ${i + 1}${deleteStr}`);
-            logObjects('Current Object', currentFunc.objects);
         }
     }
+
+    console.log('Objects deleted in destructor:', destructorDeletes);
 });
