@@ -41,7 +41,7 @@
       box-sizing:border-box;
       resize:vertical;min-height:100px;
     }
-    button {
+    button, input[type="file"]::file-selector-button {
       background:linear-gradient(180deg,#0b1220,#071022);
       border:1px solid var(--border);
       color:var(--text);
@@ -79,22 +79,46 @@
       margin-bottom:4px;
       cursor:pointer;
     }
+    .file-row {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin-top:10px;
+      flex-wrap:wrap;
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>UTF-8 Invalid Character Detector</h1>
     <p class="lead">
-      Paste text or XML below. This tool flags any non-ASCII or invalid UTF-8 characters (multi-byte or replacement) as invalid.
+      Paste text or XML below, or upload a file. This tool flags any non-ASCII or invalid UTF-8 characters (multi-byte or replacement) as invalid.
     </p>
+
     <textarea id="inputText" placeholder="Paste text or XML here..."></textarea>
-    <div class="row" style="margin-top:10px;">
+
+    <div class="file-row">
+      <input type="file" id="fileInput" accept=".txt,.xml,.csv,.json,.log,.html" />
       <button class="primary" onclick="detectInvalid()">Detect</button>
     </div>
+
     <div id="output" class="block"></div>
   </div>
 
   <script>
+    document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('inputText').value = e.target.result;
+      };
+      reader.readAsText(file);
+    }
+
     function detectInvalid() {
       const text = document.getElementById('inputText').value;
       const output = document.getElementById('output');
