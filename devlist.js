@@ -174,7 +174,9 @@ const devNames=[
     "yimin.lai",
     "yongwei.tan",
     "yuling.cheng",
-    "zafeer.hyder"
+    "zafeer.hyder",
+    "liza.manzano"
     
 ];
+
 
