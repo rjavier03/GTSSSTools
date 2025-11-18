@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCR.space Demo</title>
+<style>
+  :root{
+    --bg:#071025;
+    --panel:#0b1220;
+    --muted:#94a3b8;
+    --accent:#7dd3fc;
+    --border:rgba(255,255,255,0.08);
+    --text:#e6eef6;
+    --output-bg:#020617;
+  }
+
+  html,body{
+    height:100%;
+    margin:0;
+    background:linear-gradient(180deg,var(--bg),#071a2a);
+    color:var(--text);
+    font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+  }
+
+  .wrap{
+    max-width:880px;
+    margin:40px auto;
+    padding:24px;
+    background:var(--panel);
+    border-radius:12px;
+    box-shadow:0 8px 30px rgba(2,6,23,.6);
+    border:1px solid var(--border);
+  }
+
+  header {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:16px;
+    border-bottom:1px solid var(--border);
+    padding-bottom:12px;
+  }
+  header h1 {
+    font-size:22px;
+    color:var(--accent);
+    margin:0;
+    letter-spacing:0.5px;
+  }
+  header .tagline {
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  label {
+    font-weight:600;
+    color:var(--accent);
+    margin-bottom:4px;
+    display:block;
+    font-size:14px;
+  }
+
+  input[type="file"] {
+    width:100%;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:#031022;
+    color:var(--text);
+    font-family:ui-monospace,monospace;
+    font-size:14px;
+    box-sizing:border-box;
+    cursor:pointer;
+  }
+
+  .drop-zone {
+    margin-top:10px;
+    padding:40px;
+    text-align:center;
+    border:2px dashed var(--border);
+    border-radius:8px;
+    color:var(--muted);
+    cursor:pointer;
+    transition:background 0.2s;
+  }
+  .drop-zone.dragover {
+    background:rgba(125,211,252,0.1);
+    border-color:var(--accent);
+    color:var(--accent);
+  }
+
+  img.preview {
+    display:block;
+    max-width:100%;
+    max-height:300px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    margin-top:10px;
+  }
+
+  progress {
+    width:100%;
+    height:10px;
+    border-radius:6px;
+    margin-top:10px;
+    appearance:none;
+    -webkit-appearance:none;
+    background:#031022;
+    border:1px solid var(--border);
+  }
+  progress::-webkit-progress-bar {
+    background:#031022;
+    border-radius:6px;
+  }
+  progress::-webkit-progress-value {
+    background:var(--accent);
+    border-radius:6px;
+  }
+
+  textarea {
+    width:100%;
+    background:var(--output-bg);
+    color:#cdeffc;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:12px;
+    font-family:ui-monospace,monospace;
+    font-size:13px;
+    resize:vertical;
+    min-height:250px;
+    box-sizing:border-box;
+    white-space:pre-wrap;
+    margin-top:12px;
+  }
+
+  button {
+    background:linear-gradient(180deg,#0b1220,#071022);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:10px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    transition:all 0.2s ease;
+    font-size:14px;
+    margin-top:12px;
+    margin-right:8px;
+  }
+  button:hover { background:linear-gradient(180deg,#0d1b33,#0b1a29); }
+  button.primary { background:linear-gradient(180deg,#007b8f,#006a7a); font-weight:600; }
+  button.copy-btn {
+    background:linear-gradient(180deg,#1e293b,#0f172a);
+    border:1px solid var(--border);
+    color:var(--accent);
+    font-weight:600;
+    transition:all 0.2s ease;
+  }
+  button.copy-btn:hover {
+    background:linear-gradient(180deg,#0284c7,#0369a1);
+    color:#fff;
+    transform:translateY(-1px);
+  }
+
+  button.clear-btn {
+    background:linear-gradient(180deg,#8b1e1e,#5a0f0f);
+    border:1px solid var(--border);
+    color:#fff;
+    font-weight:600;
+  }
+  button.clear-btn:hover {
+    background:linear-gradient(180deg,#c21f1f,#801010);
+  }
+
+  .section-title {
+    margin-top:20px;
+    font-size:15px;
+    color:var(--accent);
+    font-weight:600;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Simple OCR</h1>
+    <div class="tagline">Upload, paste, or drag an image to extract text</div>
+  </header>
+
+  <label for="fileInput">Select image:</label>
+  <input type="file" id="fileInput">
+
+  <div class="drop-zone" id="dropZone">Or drag & drop image here / Paste (Ctrl+V)</div>
+
+  <img id="preview" class="preview" style="display:none;" alt="Image preview">
+
+  <progress id="progress" value="0" max="1" style="display:none;"></progress>
+
+  <div style="margin-top:10px;">
+    <button id="ocrBtn" class="primary">Run OCR</button>
+    <button id="copyBtn" class="copy-btn">Copy to Clipboard</button>
+    <button id="clearBtn" class="clear-btn">Clear</button>
+  </div>
+
+  <label class="section-title" for="result">OCR Result:</label>
+  <textarea id="result" placeholder="OCR output will appear here..."></textarea>
+</div>
+
+<script>
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+const ocrBtn = document.getElementById('ocrBtn');
+const copyBtn = document.getElementById('copyBtn');
+const clearBtn = document.getElementById('clearBtn');
+const resultEl = document.getElementById('result');
+const preview = document.getElementById('preview');
+const progressBar = document.getElementById('progress');
+
+// ⚠ Replace with your OCR.space API key
+const API_KEY = "K83443646588957";
+
+let currentFile = null;
+
+// Show image preview
+function showPreview(file) {
+    const url = URL.createObjectURL(file);
+    preview.src = url;
+    preview.style.display = "block";
+}
+
+// Clear everything
+function clearAll() {
+    currentFile = null;
+    fileInput.value = "";
+    preview.src = "";
+    preview.style.display = "none";
+    resultEl.value = "";
+    progressBar.style.display = "none";
+    dropZone.textContent = "Or drag & drop image here / Paste (Ctrl+V)";
+}
+
+// Remove non-ASCII characters, keep slashes, backslashes, punctuation
+function cleanText(text) {
+    return text.replace(/[^\x20-\x7E]/g, '');
+}
+
+// File selection
+fileInput.addEventListener('change', e => {
+    if(e.target.files.length > 0) {
+        currentFile = e.target.files[0];
+        dropZone.textContent = `Selected: ${currentFile.name}`;
+        showPreview(currentFile);
+    }
+});
+
+// Drag-and-drop
+dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', e => {
+    dropZone.classList.remove('dragover');
+});
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    if(e.dataTransfer.files.length > 0) {
+        currentFile = e.dataTransfer.files[0];
+        dropZone.textContent = `Selected: ${currentFile.name}`;
+        showPreview(currentFile);
+    }
+});
+
+// Paste from clipboard
+document.addEventListener('paste', e => {
+    const items = e.clipboardData.items;
+    for(let i=0;i<items.length;i++){
+        if(items[i].type.indexOf("image") === 0){
+            currentFile = items[i].getAsFile();
+            dropZone.textContent = `Pasted image`;
+            showPreview(currentFile);
+            break;
+        }
+    }
+});
+
+// Run OCR
+ocrBtn.addEventListener('click', async () => {
+    if(!currentFile) { alert("Please select, paste, or drop an image first."); return; }
+
+    const formData = new FormData();
+    formData.append("file", currentFile);
+    formData.append("apikey", API_KEY);
+    formData.append("language", "eng");
+
+    resultEl.value = "Running OCR...";
+    progressBar.style.display = "block";
+    progressBar.value = 0;
+
+    try {
+        const fakeProgress = setInterval(() => {
+            progressBar.value = Math.min(progressBar.value + 0.1, 0.9);
+        }, 300);
+
+        const resp = await fetch("https://api.ocr.space/parse/image", {
+            method: "POST",
+            body: formData
+        });
+
+        clearInterval(fakeProgress);
+        progressBar.value = 1;
+
+        if(!resp.ok) throw new Error("OCR request failed");
+
+        const data = await resp.json();
+
+        if(data.OCRExitCode !== 1) {
+            resultEl.value = "OCR failed: " + (data.ErrorMessage || "Unknown error");
+            return;
+        }
+
+        const parsedText = data.ParsedResults.map(r => r.ParsedText).join("\n");
+        const cleaned = cleanText(parsedText);
+        resultEl.value = cleaned;
+
+    } catch(e) {
+        console.error(e);
+        alert("OCR failed. Check console for details.");
+        resultEl.value = "";
+        progressBar.style.display = "none";
+    }
+});
+
+// Copy to clipboard
+copyBtn.addEventListener('click', () => {
+    if(resultEl.value.trim() === "") return;
+    navigator.clipboard.writeText(resultEl.value)
+        .then(() => alert("Copied to clipboard!"))
+        .catch(err => console.error("Copy failed", err));
+});
+
+// Clear button
+clearBtn.addEventListener('click', clearAll);
+
+</script>
+
+</body>
+</html>
