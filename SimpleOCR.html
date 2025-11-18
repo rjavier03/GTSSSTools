@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OCR.space Demo</title>
+<title>Smart OCR Column Tracker</title>
 <style>
   :root{
     --bg:#071025;
@@ -41,24 +41,10 @@
     border-bottom:1px solid var(--border);
     padding-bottom:12px;
   }
-  header h1 {
-    font-size:22px;
-    color:var(--accent);
-    margin:0;
-    letter-spacing:0.5px;
-  }
-  header .tagline {
-    font-size:13px;
-    color:var(--muted);
-  }
+  header h1 { font-size:22px; color:var(--accent); margin:0; letter-spacing:0.5px; }
+  header .tagline { font-size:13px; color:var(--muted); }
 
-  label {
-    font-weight:600;
-    color:var(--accent);
-    margin-bottom:4px;
-    display:block;
-    font-size:14px;
-  }
+  label { font-weight:600; color:var(--accent); margin-bottom:4px; display:block; font-size:14px; }
 
   input[type="file"] {
     width:100%;
@@ -108,14 +94,8 @@
     background:#031022;
     border:1px solid var(--border);
   }
-  progress::-webkit-progress-bar {
-    background:#031022;
-    border-radius:6px;
-  }
-  progress::-webkit-progress-value {
-    background:var(--accent);
-    border-radius:6px;
-  }
+  progress::-webkit-progress-bar { background:#031022; border-radius:6px; }
+  progress::-webkit-progress-value { background:var(--accent); border-radius:6px; }
 
   textarea {
     width:100%;
@@ -129,7 +109,7 @@
     resize:vertical;
     min-height:250px;
     box-sizing:border-box;
-    white-space:pre-wrap;
+    white-space:pre;
     margin-top:12px;
   }
 
@@ -159,7 +139,6 @@
     color:#fff;
     transform:translateY(-1px);
   }
-
   button.clear-btn {
     background:linear-gradient(180deg,#8b1e1e,#5a0f0f);
     border:1px solid var(--border);
@@ -170,20 +149,15 @@
     background:linear-gradient(180deg,#c21f1f,#801010);
   }
 
-  .section-title {
-    margin-top:20px;
-    font-size:15px;
-    color:var(--accent);
-    font-weight:600;
-  }
+  .section-title { margin-top:20px; font-size:15px; color:var(--accent); font-weight:600; }
 </style>
 </head>
 <body>
 
 <div class="wrap">
   <header>
-    <h1>Simple OCR</h1>
-    <div class="tagline">Upload, paste, or drag an image to extract text</div>
+    <h1>Smart OCR</h1>
+    <div class="tagline">Now with improved true column‑tracking</div>
   </header>
 
   <label for="fileInput">Select image:</label>
@@ -215,19 +189,15 @@ const resultEl = document.getElementById('result');
 const preview = document.getElementById('preview');
 const progressBar = document.getElementById('progress');
 
-// ⚠ Replace with your OCR.space API key
-const API_KEY = "K83443646588957";
-
+const API_KEY = "K83443646588957"; // Replace with your OCR.space API key
 let currentFile = null;
 
-// Show image preview
 function showPreview(file) {
     const url = URL.createObjectURL(file);
     preview.src = url;
     preview.style.display = "block";
 }
 
-// Clear everything
 function clearAll() {
     currentFile = null;
     fileInput.value = "";
@@ -238,39 +208,59 @@ function clearAll() {
     dropZone.textContent = "Or drag & drop image here / Paste (Ctrl+V)";
 }
 
-// Remove non-ASCII characters, keep slashes, backslashes, punctuation
+// === TRUE COLUMN TRACKING ENGINE ===
 function cleanText(text) {
-    return text.replace(/[^\x20-\x7E]/g, '');
+  text = text.replace(/\t/g, "    "); // Replace tabs with spaces
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+
+  if (lines.length === 0) return text;
+
+  const columnSplitRegex = / {3,}/; // 3+ spaces = column separator
+
+  const rows = lines.map(line => line.split(columnSplitRegex).map(cell => cell.trim()));
+
+  const maxCols = Math.max(...rows.map(r => r.length));
+
+  const normalized = rows.map(r => {
+    while (r.length < maxCols) r.push("");
+    return r;
+  });
+
+  const colWidths = Array(maxCols).fill(0);
+  normalized.forEach(row => {
+    row.forEach((col, i) => {
+      if (col.length > colWidths[i]) colWidths[i] = col.length;
+    });
+  });
+
+  const alignedLines = normalized.map(row =>
+    row.map((col, i) => col.padEnd(colWidths[i] + 2)).join("")
+  );
+
+  return alignedLines.join("\n");
 }
 
-// File selection
+// --- Event listeners ---
 fileInput.addEventListener('change', e => {
-    if(e.target.files.length > 0) {
+    if(e.target.files.length > 0){
         currentFile = e.target.files[0];
         dropZone.textContent = `Selected: ${currentFile.name}`;
         showPreview(currentFile);
     }
 });
 
-// Drag-and-drop
-dropZone.addEventListener('dragover', e => {
-    e.preventDefault();
-    dropZone.classList.add('dragover');
-});
-dropZone.addEventListener('dragleave', e => {
-    dropZone.classList.remove('dragover');
-});
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
 dropZone.addEventListener('drop', e => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
-    if(e.dataTransfer.files.length > 0) {
+    if(e.dataTransfer.files.length > 0){
         currentFile = e.dataTransfer.files[0];
         dropZone.textContent = `Selected: ${currentFile.name}`;
         showPreview(currentFile);
     }
 });
 
-// Paste from clipboard
 document.addEventListener('paste', e => {
     const items = e.clipboardData.items;
     for(let i=0;i<items.length;i++){
@@ -283,7 +273,6 @@ document.addEventListener('paste', e => {
     }
 });
 
-// Run OCR
 ocrBtn.addEventListener('click', async () => {
     if(!currentFile) { alert("Please select, paste, or drop an image first."); return; }
 
@@ -330,7 +319,6 @@ ocrBtn.addEventListener('click', async () => {
     }
 });
 
-// Copy to clipboard
 copyBtn.addEventListener('click', () => {
     if(resultEl.value.trim() === "") return;
     navigator.clipboard.writeText(resultEl.value)
@@ -338,9 +326,7 @@ copyBtn.addEventListener('click', () => {
         .catch(err => console.error("Copy failed", err));
 });
 
-// Clear button
 clearBtn.addEventListener('click', clearAll);
-
 </script>
 
 </body>
