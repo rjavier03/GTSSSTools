@@ -14,7 +14,6 @@
   --text:#e6eef6;
   --output-bg:#020617;
 }
-
 html, body {
   height:100%;
   margin:0;
@@ -26,7 +25,6 @@ html, body {
   justify-content:center;
   overflow:hidden;
 }
-
 .wrap {
   background:var(--panel);
   border:1px solid var(--border);
@@ -41,23 +39,8 @@ html, body {
   width:calc(3 * 200px + 2 * 20px + 48px);
   max-width:100%;
 }
-
-h1 {
-  margin-top:0;
-  font-size:22px;
-  color:var(--accent);
-}
-
-p.lead {
-  color:var(--muted);
-  font-size:14px;
-  margin-bottom:12px;
-  height:28px;
-  line-height:28px;
-  flex-shrink:0;
-  overflow:hidden;
-}
-
+h1 { margin-top:0; font-size:22px; color:var(--accent); }
+p.lead { color:var(--muted); font-size:14px; margin-bottom:12px; }
 input.search {
   padding:10px 12px;
   margin-bottom:20px;
@@ -68,30 +51,34 @@ input.search {
   font-size:14px;
   outline:none;
 }
-
+.switch-container {
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  margin-bottom:20px;
+  gap:16px;
+}
+.switch-label {
+  cursor:pointer;
+  padding:6px 16px;
+  border-radius:20px;
+  background:var(--output-bg);
+  transition: all 0.3s;
+}
+.switch-label.active { background:var(--accent); color:#000; }
+.section { margin-bottom:20px; }
 .menu {
   display:grid;
   grid-template-columns:repeat(3, 200px);
   gap:20px;
-  flex:1;
   overflow-y:auto;
   overflow-x:hidden;
   justify-content:center;
   align-items:start;
+  transition: opacity 0.3s ease, max-height 0.3s ease;
 }
-
-.menu::-webkit-scrollbar {
-  width:8px;
-}
-.menu::-webkit-scrollbar-thumb {
-  background:var(--accent);
-  border-radius:8px;
-}
-.menu::-webkit-scrollbar-thumb:hover {
-  background:#5ac0e8;
-}
-
-a.card {
+.menu.hidden { opacity:0; max-height:0; overflow:hidden; }
+.card {
   display:flex;
   flex-direction:column;
   align-items:center;
@@ -105,198 +92,207 @@ a.card {
   font-weight:600;
   font-size:15px;
   text-decoration:none;
-  transition:transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.3s ease;
+  transition:transform 0.3s ease, box-shadow 0.3s ease;
   text-align:center;
   box-sizing:border-box;
   padding:10px;
   cursor:grab;
-  will-change: transform;
-  user-select:none;
+  position:relative;
 }
-
-a.card:hover {
+.card.dragging { opacity:0.2; cursor:grabbing; }
+.card:hover { 
   color:var(--accent);
   box-shadow:inset 0 0 20px rgba(125,211,252,0.15),0 0 10px rgba(125,211,252,0.2);
   transform:translateY(-3px);
 }
-
-a.card.dragging {
-  opacity: 0.2;
-  cursor:grabbing;
-}
-
-footer {
+.card button.add-btn {
   margin-top:12px;
-  color:var(--muted);
-  font-size:12px;
-  flex-shrink:0;
+  padding:10px 16px;
+  font-size:16px;
+  background:var(--accent);
+  border:none;
+  border-radius:6px;
+  color:#000;
+  font-weight:600;
+  cursor:pointer;
+  width:80%;
 }
+.card button.add-btn:hover { background:#5ac0e8; }
 
-/* floating ghost preview */
-.drag-ghost {
-  position: fixed;
-  pointer-events:none;
-  z-index:10000;
-  transform:translate(-50%, -50%) scale(1.05);
-  opacity:0.85;
-  transition:transform 0.2s ease-out, left 0.08s linear, top 0.08s linear;
+/* Tooltip for My Tools */
+.card[data-tooltip]:hover::after {
+  content:attr(data-tooltip);
+  position:absolute;
+  bottom:110%;
+  background:var(--accent);
+  color:#000;
+  font-size:12px;
+  padding:4px 8px;
+  border-radius:4px;
+  white-space:nowrap;
 }
+footer { margin-top:12px; color:var(--muted); font-size:12px; flex-shrink:0; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Developer Tools</h1>
-  <p class="lead">Choose a utility to launch</p>
+  <p class="lead">Manage your tools</p>
 
   <input type="text" class="search" id="searchInput" placeholder="Search tools..." oninput="filterCards()">
 
-  <div class="menu" id="menu">
-    <a class="card" href="./xmlbeautifier.html">XML Beautifier</a>
-    <a class="card" href="./transactioncount.html">Transaction Count Generator</a>
-    <a class="card" href="./TranslationKeyWordSearch.html">Translation Keyword Search</a>
-    <a class="card" href="./PQSimleRestart.html">Simple PQ Command</a>
-    <a class="card" href="./valueExtractor.html">Field Extract (EDIFact, CSV)</a>
-    <a class="card" href="./RequirementTemplate.html">Requirement Template</a>
-    <a class="card" href="./SpecialCharCode.html">Special Char Code Generator</a>
-    <a class="card" href="./TranslationExport.html">Export Dev Template</a>
-    <a class="card" href="./filerestore.html">Restore File Template</a>
-    <a class="card" href="./invalidcharchecker.html">Invalid Char Checker</a>
-    <a class="card" href="./BlankdocsV1.html">BlankDocs v1</a>
-    <a class="card" href="./FixField.html">FixField Extract</a>
-    <a class="card" href="./JSONValidator.html">JSON Validator</a>
-    <a class="card" href="./Code Checker/CodeChecker.html">Code Checker v1</a>
-    <a class="card" href="./SimpleOCR.html">Simple OCR</a>
+  <div class="switch-container">
+    <div class="switch-label active" id="myToolsSwitch" onclick="toggleView('myTools')">My Tools</div>
+    <div class="switch-label" id="allToolsSwitch" onclick="toggleView('allTools')">All Tools</div>
+  </div>
+
+  <div class="section">
+    <div class="menu" id="toolsMenu"></div>
   </div>
 
   <footer>© 2025 Developer Utilities</footer>
 </div>
 
 <script>
-const menu = document.getElementById('menu');
-let draggedEl = null;
-let ghost = null;
-let currentTarget = null;
+const tools = [
+  {name:"XML Beautifier", href:"./xmlbeautifier.html"},
+  {name:"Transaction Count Generator", href:"./transactioncount.html"},
+  {name:"Translation Keyword Search", href:"./TranslationKeyWordSearch.html"},
+  {name:"Simple PQ Command", href:"./PQSimleRestart.html"},
+  {name:"Field Extract (EDIFact, CSV)", href:"./valueExtractor.html"},
+  {name:"Requirement Template", href:"./RequirementTemplate.html"},
+  {name:"Special Char Code Generator", href:"./SpecialCharCode.html"},
+  {name:"Export Dev Template", href:"./TranslationExport.html"},
+  {name:"Restore File Template", href:"./filerestore.html"},
+  {name:"Invalid Char Checker", href:"./invalidcharchecker.html"},
+  {name:"BlankDocs v1", href:"./BlankdocsV1.html"},
+  {name:"FixField Extract", href:"./FixField.html"},
+  {name:"JSON Validator", href:"./JSONValidator.html"},
+  {name:"Code Checker v1", href:"./Code Checker/CodeChecker.html"},
+  {name:"Simple OCR", href:"./SimpleOCR.html"}
+];
 
-// ---- Restore saved order ----
-document.addEventListener("DOMContentLoaded", () => {
-  const savedOrder = JSON.parse(localStorage.getItem("cardOrder"));
-  if (savedOrder) {
-    const cards = Array.from(menu.children);
-    savedOrder.forEach(href => {
-      const card = cards.find(c => c.getAttribute("href") === href);
-      if (card) menu.appendChild(card);
-    });
-  }
-  document.querySelectorAll('.card').forEach(c => c.setAttribute('draggable', 'true'));
-});
+const toolsMenu = document.getElementById("toolsMenu");
+let myTools = JSON.parse(localStorage.getItem("myTools")) || [];
+let currentView = 'myTools';
 
-// ---- DRAG START ----
-menu.addEventListener('dragstart', e => {
-  if (!e.target.classList.contains('card')) return;
-  draggedEl = e.target;
-  draggedEl.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setDragImage(new Image(), 0, 0);
+function renderTools(){
+  toolsMenu.innerHTML="";
+  let list = currentView==='myTools' ? myTools : tools;
 
-  ghost = draggedEl.cloneNode(true);
-  ghost.classList.add('drag-ghost');
-  document.body.appendChild(ghost);
-});
+  list.forEach(tool=>{
+    let card;
+    if(currentView==='myTools'){
+      card = document.createElement("a");
+      card.className="card";
+      card.href=tool.href;
+      card.setAttribute("draggable","true");
+      card.textContent=tool.name;
+      card.setAttribute("data-tooltip","Double-click to remove");
 
-// ---- DRAG MOVE ----
-menu.addEventListener('drag', e => {
-  if (ghost && e.clientX && e.clientY) {
-    ghost.style.left = e.clientX + 'px';
-    ghost.style.top = e.clientY + 'px';
-  }
-});
-
-// ---- DRAG END ----
-menu.addEventListener('dragend', () => {
-  if (ghost) ghost.remove();
-  if (draggedEl) draggedEl.classList.remove('dragging');
-  draggedEl = null;
-  currentTarget = null;
-  saveOrder();
-});
-
-// ---- DRAG OVER ----
-menu.addEventListener('dragover', e => {
-  e.preventDefault();
-  if (!draggedEl) return;
-
-  const after = getClosestCard(menu, e.clientX, e.clientY);
-  if (after && after !== currentTarget) {
-    currentTarget = after;
-
-    const oldPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
-    menu.insertBefore(draggedEl, after);
-    const newPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
-    animateAll(oldPositions, newPositions);
-  } else if (!after && menu.lastElementChild !== draggedEl) {
-    const oldPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
-    menu.appendChild(draggedEl);
-    const newPositions = new Map(Array.from(menu.children).map(el => [el, el.getBoundingClientRect()]));
-    animateAll(oldPositions, newPositions);
-  }
-});
-
-// ---- Get nearest card ----
-function getClosestCard(container, x, y) {
-  const cards = [...container.querySelectorAll('.card:not(.dragging)')];
-  let closest = null;
-  let minDist = Infinity;
-  for (const card of cards) {
-    const rect = card.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const dist = Math.hypot(x - cx, y - cy);
-    if (dist < minDist) {
-      minDist = dist;
-      closest = card;
+      // double-click removal
+      card.ondblclick=(e)=>{
+        e.preventDefault(); // prevent navigation
+        if(confirm(`Remove "${tool.name}" from My Tools?`)){
+          myTools = myTools.filter(t=>t.href!==tool.href);
+          saveMyTools();
+          renderTools();
+        }
+      }
+    } else { // allTools view
+      card = document.createElement("div");
+      card.className="card";
+      card.textContent=tool.name;
+      // only show Add if not yet added
+      if(!myTools.find(t=>t.href===tool.href)){
+        const btn = document.createElement("button");
+        btn.className="add-btn";
+        btn.textContent="Add";
+        btn.onclick=()=>addToMyTools(tool);
+        card.appendChild(btn);
+      }
     }
-  }
-  if (closest) {
-    const r = closest.getBoundingClientRect();
-    if (x > r.left && x < r.right && y > r.top && y < r.bottom)
-      return closest;
-  }
-  return null;
+    toolsMenu.appendChild(card);
+  });
+
+  // enable drag only for My Tools
+  if(currentView==='myTools') enableDrag(toolsMenu);
 }
 
-// ---- Smooth FLIP animation ----
-function animateAll(oldPos, newPos) {
-  for (const [el, oldRect] of oldPos.entries()) {
-    const newRect = newPos.get(el);
-    if (!newRect) continue;
-    const dx = oldRect.left - newRect.left;
-    const dy = oldRect.top - newRect.top;
-    if (dx || dy) {
-      el.style.transform = `translate(${dx}px, ${dy}px)`;
-      el.style.transition = 'transform 0s';
-      requestAnimationFrame(() => {
-        el.style.transition = 'transform 0.5s cubic-bezier(0.25, 1, 0.5, 1)';
-        el.style.transform = '';
-      });
-    }
+function addToMyTools(tool){
+  if(!myTools.find(t=>t.href===tool.href)){
+    myTools.push(tool);
+    saveMyTools();
+    renderTools();
   }
 }
 
-// ---- Save order ----
-function saveOrder() {
-  const order = Array.from(menu.children).map(c => c.getAttribute('href'));
-  localStorage.setItem('cardOrder', JSON.stringify(order));
+function saveMyTools(){ localStorage.setItem("myTools", JSON.stringify(myTools)); }
+
+function toggleView(view){
+  currentView=view;
+  document.getElementById('myToolsSwitch').classList.toggle('active', view==='myTools');
+  document.getElementById('allToolsSwitch').classList.toggle('active', view==='allTools');
+  renderTools();
 }
 
-// ---- Search ----
-function filterCards() {
-  const filter = document.getElementById('searchInput').value.toLowerCase();
-  const cards = document.querySelectorAll('.menu .card');
-  cards.forEach(card => {
-    card.style.display = card.textContent.toLowerCase().includes(filter) ? "flex" : "none";
+// --- Search ---
+function filterCards(){
+  const filter=document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('.menu .card').forEach(card=>{
+    const text=card.textContent.toLowerCase();
+    card.style.display=text.includes(filter) ? "flex" : "none";
   });
 }
+
+// --- Drag for My Tools ---
+function enableDrag(container){
+  let draggedEl=null;
+  let currentTarget=null;
+
+  container.addEventListener('dragstart', e=>{
+    if(!e.target.classList.contains('card')) return;
+    draggedEl=e.target;
+    draggedEl.classList.add('dragging');
+    e.dataTransfer.effectAllowed='move';
+    e.dataTransfer.setDragImage(new Image(),0,0);
+  });
+
+  container.addEventListener('dragover', e=>{
+    e.preventDefault();
+    if(!draggedEl) return;
+    const after=getClosestCard(container,e.clientX,e.clientY);
+    if(after && after!==currentTarget){
+      currentTarget=after;
+      container.insertBefore(draggedEl, after);
+    } else if(!after && container.lastElementChild!==draggedEl){
+      container.appendChild(draggedEl);
+    }
+  });
+
+  container.addEventListener('dragend', ()=>{
+    if(draggedEl) draggedEl.classList.remove('dragging');
+    draggedEl=null;
+    currentTarget=null;
+    saveMyTools();
+  });
+}
+
+function getClosestCard(container,x,y){
+  const cards=[...container.querySelectorAll('.card:not(.dragging)')];
+  let closest=null,minDist=Infinity;
+  for(const card of cards){
+    const rect=card.getBoundingClientRect();
+    const cx=rect.left+rect.width/2;
+    const cy=rect.top+rect.height/2;
+    const dist=Math.hypot(x-cx,y-cy);
+    if(dist<minDist){ minDist=dist; closest=card; }
+  }
+  return closest;
+}
+
+// initial render
+renderTools();
 </script>
 </body>
 </html>
-
