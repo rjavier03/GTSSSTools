@@ -105,32 +105,20 @@ input.search {
   box-shadow:inset 0 0 20px rgba(125,211,252,0.15),0 0 10px rgba(125,211,252,0.2);
   transform:translateY(-3px);
 }
-.card button.add-btn {
+.card button {
   margin-top:12px;
   padding:10px 16px;
   font-size:16px;
-  background:var(--accent);
   border:none;
   border-radius:6px;
-  color:#000;
   font-weight:600;
   cursor:pointer;
   width:80%;
 }
+.card button.add-btn { background:var(--accent); color:#000; }
 .card button.add-btn:hover { background:#5ac0e8; }
-
-/* Tooltip for My Tools */
-.card[data-tooltip]:hover::after {
-  content:attr(data-tooltip);
-  position:absolute;
-  bottom:110%;
-  background:var(--accent);
-  color:#000;
-  font-size:12px;
-  padding:4px 8px;
-  border-radius:4px;
-  white-space:nowrap;
-}
+.card button.remove-btn { background:#ff5c5c; color:#fff; }
+.card button.remove-btn:hover { background:#ff2a2a; }
 footer { margin-top:12px; color:var(--muted); font-size:12px; flex-shrink:0; }
 </style>
 </head>
@@ -188,34 +176,32 @@ function renderTools(){
       card.href=tool.href;
       card.setAttribute("draggable","true");
       card.textContent=tool.name;
-      card.setAttribute("data-tooltip","Double-click to remove");
-
-      // double-click removal
-      card.ondblclick=(e)=>{
-        e.preventDefault(); // prevent navigation
-        if(confirm(`Remove "${tool.name}" from My Tools?`)){
-          myTools = myTools.filter(t=>t.href!==tool.href);
-          saveMyTools();
-          renderTools();
-        }
-      }
     } else { // allTools view
       card = document.createElement("div");
       card.className="card";
       card.textContent=tool.name;
-      // only show Add if not yet added
-      if(!myTools.find(t=>t.href===tool.href)){
-        const btn = document.createElement("button");
+
+      const existing = myTools.find(t=>t.href===tool.href);
+      const btn = document.createElement("button");
+      if(existing){
+        btn.className="remove-btn";
+        btn.textContent="Remove";
+        btn.onclick = ()=> {
+          myTools = myTools.filter(t=>t.href!==tool.href);
+          saveMyTools();
+          renderTools();
+        };
+      } else {
         btn.className="add-btn";
         btn.textContent="Add";
-        btn.onclick=()=>addToMyTools(tool);
-        card.appendChild(btn);
+        btn.onclick = ()=>addToMyTools(tool);
       }
+      card.appendChild(btn);
     }
+
     toolsMenu.appendChild(card);
   });
 
-  // enable drag only for My Tools
   if(currentView==='myTools') enableDrag(toolsMenu);
 }
 
