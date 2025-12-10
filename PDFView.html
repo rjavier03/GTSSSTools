@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Drag / Upload -> View as .pdf</title>
+  <style>
+    :root{--bg:#0f1724;--panel:#0b1220;--muted:#9aa6b2;--accent:#7dd3fc}
+    *{box-sizing:border-box}
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;min-height:100vh;margin:0;background:linear-gradient(180deg,#071025, #0b1220);color:#e6eef6;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:18px;box-shadow:0 6px 24px rgba(2,6,23,0.6);width:980px;max-width:100%}
+    .drop{border:2px dashed rgba(125,211,252,0.22);padding:28px;border-radius:10px;text-align:center;cursor:pointer;user-select:none}
+    .drop.dragover{background:rgba(125,211,252,0.02);border-color:rgba(125,211,252,0.48)}
+    input[type=file]{display:none}
+    .hint{color:var(--muted);margin-top:8px;font-size:13px}
+    iframe{width:100%;height:620px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);margin-top:14px}
+    .row{display:flex;gap:12px;align-items:center}
+    .btn{background:var(--accent);color:#012; padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+    .warn{color:#ffd166;font-weight:600}
+    .meta{font-size:13px;color:var(--muted);margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Upload or drag a file — viewer will append <code>.pdf</code> and try to display it</h2>
+    <p class="hint">Drag any file into the area or click to choose. The file will be served to an in-page PDF viewer with a filename that ends in <code>.pdf</code>.</p>
+
+    <div id="drop" class="drop" role="button" tabindex="0" aria-label="Drop file here or click to select">
+      <strong id="dropText">Drop file here or click to select</strong>
+      <div class="meta" id="meta">No file selected</div>
+    </div>
+
+    <input id="fileInput" type="file" accept="*/*" aria-hidden="true">
+
+    <div style="margin-top:12px" class="row">
+      <button id="downloadBtn" class="btn" style="display:none">Download .pdf</button>
+      <div id="notice" class="warn" style="display:none;margin-left:8px">Note: if the file is not actually a PDF it may not render in the browser.</div>
+    </div>
+
+    <iframe id="viewer" style="display:none" allow="fullscreen"></iframe>
+</div>
+
+  <script>
+    const drop = document.getElementById('drop');
+    const input = document.getElementById('fileInput');
+    const viewer = document.getElementById('viewer');
+    const meta = document.getElementById('meta');
+    const dropText = document.getElementById('dropText');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const notice = document.getElementById('notice');
+
+    // Keep last object URL so we can revoke when replaced
+    let lastObjectURL = null;
+
+    // Prevent default drag behaviors on document to allow drop on our drop area
+    ['dragenter','dragover','dragleave','drop'].forEach(evt => {
+      document.addEventListener(evt, e => {
+        // allow drop only on our element; otherwise prevent to stop browser from opening file
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    });
+
+    // Drop area handlers
+    drop.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      drop.classList.add('dragover');
+    });
+    drop.addEventListener('dragleave', (e) => {
+      drop.classList.remove('dragover');
+    });
+    drop.addEventListener('drop', (e) => {
+      e.preventDefault();
+      drop.classList.remove('dragover');
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) handleFile(f);
+    });
+
+    // Click should open file picker exactly once
+    drop.addEventListener('click', (e) => {
+      // ignore clicks from children that might cause double events
+      input.value = null; // reset so change event fires every time
+      input.click();
+    });
+
+    // keyboard accessibility: Enter/Space opens file picker
+    drop.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        input.value = null;
+        input.click();
+      }
+    });
+
+    // File selected via picker
+    input.addEventListener('change', () => {
+      const f = input.files && input.files[0];
+      if (f) handleFile(f);
+    });
+
+    function ensurePdfFilename(name){
+      if (!name) return 'file.pdf';
+      return name.toLowerCase().endsWith('.pdf') ? name : name + '.pdf';
+    }
+
+    function handleFile(file){
+      const sizeKb = Math.round(file.size/1024);
+      const originalName = file.name || 'file';
+      const finalName = ensurePdfFilename(originalName);
+
+      meta.textContent = `Selected: ${originalName} — ${sizeKb} KB`;
+      dropText.textContent = 'File ready — viewing below if possible';
+
+      if (file.type !== 'application/pdf'){
+        notice.style.display = 'inline-block';
+      } else {
+        notice.style.display = 'none';
+      }
+
+      // Read file as ArrayBuffer then create blob with application/pdf mime (does not convert file contents)
+      const reader = new FileReader();
+      reader.onload = function(evt){
+        const arr = evt.target.result;
+        const blob = new Blob([arr], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+
+        // revoke previous
+        if (lastObjectURL) URL.revokeObjectURL(lastObjectURL);
+        lastObjectURL = url;
+
+        viewer.src = url;
+        viewer.style.display = 'block';
+
+        downloadBtn.style.display = 'inline-block';
+        downloadBtn.onclick = function(){
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = finalName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        };
+      };
+      reader.onerror = function(){ meta.textContent = 'Error reading file'; };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // Paste support (optional)
+    window.addEventListener('paste', (e) => {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (let i=0;i<items.length;i++){
+        const it = items[i];
+        if (it.kind === 'file'){
+          const f = it.getAsFile();
+          if (f) handleFile(f);
+        }
+      }
+    });
+
+    // Clean up object URLs on unload
+    window.addEventListener('beforeunload', () => {
+      if (lastObjectURL) URL.revokeObjectURL(lastObjectURL);
+    });
+  </script>
+</body>
+</html>
