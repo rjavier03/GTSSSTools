@@ -61,9 +61,22 @@
     white-space:pre-wrap;
     min-height:120px;
     margin-top:16px;
+    position: relative;
   }
   .label{font-weight:600;color:var(--accent);margin-bottom:8px;font-size:14px}
   .hint{margin-top:8px;color:var(--muted);font-size:12px}
+  .copy-btn{
+    position: absolute;
+    top:8px;
+    right:8px;
+    background:var(--accent);
+    color:#071025;
+    border:none;
+    padding:4px 8px;
+    border-radius:4px;
+    font-size:12px;
+    cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -80,7 +93,9 @@
     </div>
 
     <div class="label" style="margin-top:20px;">Generated Linux Command</div>
-    <div class="block" id="output" readonly></div>
+    <div class="block" id="output" readonly>
+      <button class="copy-btn" onclick="copyCommand()">Copy</button>
+    </div>
 
     <div class="hint">💡 Tip: The command searches inside <code>/home/developer/Dev/Src/Trunks/Translations</code> ignoring <code>.bzr</code> and <code>Makefile</code> paths.</div>
   </div>
@@ -112,6 +127,21 @@
     const command = `
 find . -not -path '*/.bzr*' -not -name 'Makefile' -maxdepth 4 -type f -print0 | xargs -0 grep -IilF "${keyword}"`;
     output.textContent = command;
+    
+    // Re-add copy button after updating text
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = 'Copy';
+    copyBtn.className = 'copy-btn';
+    copyBtn.onclick = copyCommand;
+    output.appendChild(copyBtn);
+  }
+
+  function copyCommand() {
+    const output = document.getElementById('output');
+    const text = output.childNodes[0].nodeValue.trim();
+    navigator.clipboard.writeText(text).then(() => {
+      alert('✅ Command copied to clipboard!');
+    });
   }
 </script>
 </body>
