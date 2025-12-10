@@ -30,16 +30,19 @@
   }
   h1{margin:0 0 10px;font-size:18px;color:var(--accent)}
   p.lead{margin:0 0 16px;color:var(--muted);font-size:13px}
-  input[type="text"]{
-    width:100%;
-    padding:12px;
+  select,input[type="number"]{
+    padding:10px;
     border-radius:8px;
     border:1px solid var(--border);
     background:#031022;
     color:var(--text);
     font-family:ui-monospace,monospace;
     font-size:14px;
-    box-sizing:border-box;
+  }
+  input[disabled]{
+    background:#0b1220;
+    color:#777;
+    cursor:not-allowed;
   }
   button{
     background:linear-gradient(180deg,#0b1220,#071022);
@@ -63,7 +66,6 @@
     min-height:200px;
   }
   .label{font-weight:600;color:var(--accent);margin-bottom:8px;font-size:14px}
-  .hint{margin-top:8px;color:var(--muted);font-size:12px}
   .row{display:flex;gap:10px;margin-top:12px;align-items:center}
   .radio-group{display:flex;gap:16px;align-items:center;margin-bottom:10px}
   .radio-group label{color:var(--muted);font-size:13px;cursor:pointer}
@@ -93,14 +95,28 @@
 <body>
 <div class="wrap">
   <h1>PQ Stop / Start Generator</h1>
-  <p class="lead">Enter comma-separated values like <code>1</code>, <code>UPLOAD 1</code>, or <code>3, UPLOAD 2</code>. Then choose between EU or AU mode.</p>
+  <p class="lead">Select an action and enter a number if applicable. Then choose EU or AU mode.</p>
 
   <div class="radio-group">
     <label><input type="radio" name="region" value="EU" checked> EU</label>
     <label><input type="radio" name="region" value="AU"> AU</label>
   </div>
 
-  <input id="input" type="text" placeholder="e.g. 1, UPLOAD 1, 2" autocomplete="off">
+  <div class="row">
+    <select id="actionSelect">
+      <option value="PQ" data-has-number="true">PQ</option>
+      <option value="UPLOADED" data-has-number="true">UPLOADED</option>
+      <option value="CREATED" data-has-number="true">CREATED</option>
+      <option value="CARBONCOPIED" data-has-number="true">CARBONCOPIED</option>
+      <option value="REDIRECTED" data-has-number="true">REDIRECTED</option>
+      <option value="RESENT" data-has-number="true">RESENT</option>
+      <option value="MODIFIEDANDRESENT" data-has-number="true">MODIFIEDANDRESENT</option>
+      <option value="CriticalErrorEmailer" data-has-number="false">CriticalErrorEmailer</option>
+      <option value="V2RedeliveredDocHandler" data-has-number="false">V2RedeliveredDocHandler</option>
+      <option value="ErrorLogNotifier" data-has-number="false">ErrorLogNotifier</option>
+    </select>
+    <input id="numberInput" type="number" min="1" placeholder="Number">
+  </div>
 
   <div class="row">
     <button id="genBtn" class="primary">Generate</button>
@@ -119,9 +135,6 @@
       <div id="startOut" class="block">// START commands will appear here</div>
     </div>
   </div>
-
-  <div class="hint">Tip: Whitespace is ignored. <strong>UPLOAD</strong> auto-converts to <strong>UPLOADED</strong>.  
-  Region selection changes prefix: <strong>EU</strong> = EUV2..., <strong>AU</strong> = V2...</div>
 
   <div class="instructions">
     <h2>📘 LoadBalancer Instructions</h2>
@@ -143,7 +156,8 @@
 
 <script>
 (function(){
-  const input = document.getElementById('input');
+  const actionSelect = document.getElementById('actionSelect');
+  const numberInput = document.getElementById('numberInput');
   const genBtn = document.getElementById('genBtn');
   const clearBtn = document.getElementById('clearBtn');
   const stopOut = document.getElementById('stopOut');
@@ -152,77 +166,75 @@
   const copyStartBtn = document.getElementById('copyStartBtn');
   const regionRadios = document.querySelectorAll('input[name="region"]');
 
+  // Enable/disable number input based on selection
+  actionSelect.addEventListener('change', ()=>{
+    const selected = actionSelect.selectedOptions[0];
+    const hasNumber = selected.getAttribute('data-has-number') === 'true';
+    numberInput.disabled = !hasNumber;
+    if(!hasNumber) numberInput.value = '';
+  });
+
   function getRegion(){
     return Array.from(regionRadios).find(r => r.checked)?.value || 'EU';
   }
 
-  function normalizeToken(t){
-    return t.replace(/[\t\r\n]+/g,' ').replace(/\s+/g,' ').trim();
-  }
-
-  function normalizeAction(a){
-    const up = a.toUpperCase();
-    if(up === 'UPLOAD') return 'UPLOADED';
-    return up;
-  }
-
-  function generate(tokens, region){
-    const stopLines = [];
-    const startLines = [];
+  function generateCommand(action, number, region){
     const prefix = (region === 'AU') ? '' : 'EU';
-
-    for(const raw of tokens){
-      const t = normalizeToken(raw);
-      if(!t) continue;
-      if(/^[0-9]+$/.test(t)){
-        stopLines.push(`# touch StopV2DocHandler_${t}.sig`);
-        startLines.push(`# (./${prefix}V2DocHandler ${t} &)`);
-        continue;
-      }
-      const m = t.match(/^([A-Za-z_]+)\s+([0-9]+)$/);
-      if(m){
-        const act = normalizeAction(m[1]);
-        const num = m[2];
-        stopLines.push(`# touch StopV2LoadBalancer_${act}_${num}.sig`);
-        startLines.push(`# (./${prefix}V2LoadBalancer ${act} ${num} &)`);
-        continue;
-      }
-      const m2 = t.match(/^([A-Za-z_]+)[_\-]?([0-9]+)$/);
-      if(m2){
-        const act = normalizeAction(m2[1]);
-        const num = m2[2];
-        stopLines.push(`# touch StopV2LoadBalancer_${act}_${num}.sig`);
-        startLines.push(`# (./${prefix}V2LoadBalancer ${act} ${num} &)`);
-        continue;
-      }
-      stopLines.push(`# Skipping invalid input: "${t}"`);
-      startLines.push(`# Skipping invalid input: "${t}"`);
+    let stopCmd = '';
+    let startCmd = '';
+    switch(action){
+      case 'PQ':
+        stopCmd = `touch StopV2DocHandler_${number}.sig`;
+        startCmd = `(./${prefix}V2DocHandler ${number} &)`;
+        break;
+      case 'UPLOADED':
+      case 'CREATED':
+      case 'CARBONCOPIED':
+      case 'REDIRECTED':
+      case 'RESENT':
+      case 'MODIFIEDANDRESENT':
+        stopCmd = `touch StopV2LoadBalancer_${action}_${number}.sig`;
+        startCmd = `(./${prefix}V2LoadBalancer ${action} ${number} &)`;
+        break;
+      case 'CriticalErrorEmailer':
+        stopCmd = `touch StopCriticalErrorEmailer.sig`;
+        startCmd = `(./CriticalErrorEmailer map-01-prod-03 map-01-prod-03 &)`;
+        break;
+      case 'V2RedeliveredDocHandler':
+        stopCmd = `touch StopV2RedeliveredDocHandler.sig`;
+        startCmd = `(./EUV2RedeliveredDocHandler &)`;
+        break;
+      case 'ErrorLogNotifier':
+        stopCmd = `touch StopErrorLogNotifier.sig`;
+        startCmd = `(./EUErrorLogNotifier map-01-prod-03 &)`;
+        break;
+      default:
+        stopCmd = 'Skipping invalid input';
+        startCmd = 'Skipping invalid input';
     }
-    return {stop: stopLines.join('\n') || '// None', start: startLines.join('\n') || '// None'};
+    return {stop: stopCmd, start: startCmd};
   }
 
-  function generateOutput(){
-    const parts = (input.value || '').split(',').map(p=>p.trim()).filter(Boolean);
+  genBtn.addEventListener('click', ()=>{
+    const action = actionSelect.value;
+    const number = numberInput.value.trim();
     const region = getRegion();
-    const res = generate(parts, region);
+    const selected = actionSelect.selectedOptions[0];
+    const hasNumber = selected.getAttribute('data-has-number') === 'true';
+    if(hasNumber && !number){
+      alert('Please enter a number.');
+      return;
+    }
+    const res = generateCommand(action, number, region);
     stopOut.textContent = res.stop;
     startOut.textContent = res.start;
-  }
+  });
 
-  function sanitizePaste(e){
-    e.preventDefault();
-    const txt = (e.clipboardData || window.clipboardData).getData('text');
-    const cleaned = txt.replace(/[\t\r\n]+/g,' ').replace(/\s*,\s*/g, ', ').trim();
-    document.execCommand('insertText', false, cleaned);
-  }
-
-  genBtn.addEventListener('click', generateOutput);
   clearBtn.addEventListener('click', ()=>{
-    input.value='';
+    numberInput.value='';
     stopOut.textContent='// STOP commands will appear here';
     startOut.textContent='// START commands will appear here';
   });
-  input.addEventListener('paste', sanitizePaste);
 
   async function copyToClipboard(text, btn){
     try{
