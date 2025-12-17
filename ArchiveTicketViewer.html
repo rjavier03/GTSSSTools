@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ticketing Timeline Viewer</title>
+<style>
+  :root{
+    --bg:#071025;
+    --panel:#0b1220;
+    --muted:#94a3b8;
+    --accent:#7dd3fc;
+    --border:rgba(255,255,255,0.08);
+    --text:#e6eef6;
+    --output-bg:#020617;
+  }
+  .light-mode {
+    --bg:#f0f0f0;
+    --panel:#ffffff;
+    --muted:#555;
+    --accent:#007bff;
+    --border:rgba(0,0,0,0.1);
+    --text:#111;
+    --output-bg:#eaeaea;
+  }
+  html,body{
+    height:100%;
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+    display:flex;
+    flex-direction:column;
+  }
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px 20px;
+    border-bottom:1px solid var(--border);
+    flex-shrink:0;
+  }
+  header h1{
+    margin:0;
+    color:var(--accent);
+  }
+  header .queryid{
+    font-size:14px;
+    color:var(--muted);
+  }
+  #controls{
+    padding:10px 20px;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    flex-shrink:0;
+  }
+  input[type="file"]{
+    padding:6px;
+    border-radius:4px;
+    border:1px solid var(--border);
+    background:var(--panel);
+    color:var(--text);
+  }
+  button{
+    padding:6px 12px;
+    border-radius:4px;
+    border:1px solid var(--border);
+    background:var(--panel);
+    color:var(--text);
+    cursor:pointer;
+  }
+  button:hover{
+    background:var(--accent);
+    color:#fff;
+  }
+  #main{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    flex:1;
+    overflow:auto;
+    display:block;
+  }
+  table thead, table tbody{
+    display:block;
+  }
+  table tbody{
+    overflow:auto;
+    height:100%;
+  }
+  th,td{
+    padding:6px 10px;
+    border-bottom:1px solid var(--border);
+    text-align:left;
+    font-size:13px;
+  }
+  th{
+    cursor:pointer;
+    background:var(--panel);
+    color:var(--accent);
+  }
+  tr{
+    display:table;
+    width:100%;
+    table-layout:fixed;
+  }
+  tr:hover{
+    background:rgba(125,211,252,0.1);
+  }
+  #resizer{
+    height:6px;
+    cursor:row-resize;
+    background:var(--border);
+  }
+  #preview{
+    height:200px;
+    min-height:100px;
+    max-height:70%;
+    background:var(--output-bg);
+    overflow:auto;
+    padding:10px 20px;
+    border-top:1px solid var(--border);
+    flex-shrink:0;
+  }
+  #preview h3{
+    margin:0 0 6px 0;
+    color:var(--accent);
+  }
+  .preview-row{
+    margin-bottom:4px;
+  }
+  .preview-label{
+    font-weight:600;
+    color:var(--muted);
+    margin-right:4px;
+  }
+  .image-modal,.instruction-modal{
+    position:fixed;
+    top:0; left:0; right:0; bottom:0;
+    background:rgba(0,0,0,0.8);
+    display:none;
+    justify-content:center;
+    align-items:center;
+    z-index:9999;
+    overflow:auto;
+    padding:20px;
+  }
+  .image-modal img{
+    max-width:90%;
+    max-height:90%;
+  }
+  .instruction-content{
+    background:var(--panel);
+    color:var(--text);
+    padding:20px;
+    border-radius:10px;
+    max-width:600px;
+    width:100%;
+    box-sizing:border-box;
+  }
+  .instruction-content h2{
+    margin-top:0;
+    color:var(--accent);
+  }
+  .instruction-content p{
+    margin-bottom:10px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ticket Timeline</h1>
+  <div class="queryid" id="queryIDHeader">QueryID: </div>
+  <div>
+    <button onclick="toggleMode()">Toggle Light/Night</button>
+    <button onclick="openInstructionModal()">Instructions</button>
+  </div>
+</header>
+
+<div id="controls">
+  <label>Email XML: <input type="file" id="emailFile" accept=".xml"></label>
+  <label>Note XML: <input type="file" id="noteFile" accept=".xml"></label>
+</div>
+
+<div id="main">
+  <table id="recordTable">
+    <thead>
+      <tr>
+        <th onclick="sortByDate()">CreationDateTime &#x25B2;&#x25BC;</th>
+        <th>Subject/Note</th>
+        <th>Type</th>
+        <th>Direction</th>
+        <th>ContactID</th>
+        <th>UserID</th>
+        <th>From</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div id="resizer"></div>
+  <div id="preview">
+    <div class="preview-row"><span class="preview-label">Subject:</span><span id="previewSubject"></span></div>
+    <div class="preview-row" id="fromRow"><span class="preview-label">From:</span><span id="previewFrom"></span></div>
+    <div class="preview-row" id="toRow"><span class="preview-label">To:</span><span id="previewTo"></span></div>
+    <div class="preview-row" id="ccRow"><span class="preview-label">CC:</span><span id="previewCC"></span></div>
+    <div class="preview-row" id="bccRow"><span class="preview-label">BCC:</span><span id="previewBCC"></span></div>
+    <div class="preview-row" id="previewUserIDRow"><span class="preview-label">UserID:</span><span id="previewUserID"></span></div>
+    <div class="preview-row" id="previewBodyHTML"></div>
+  </div>
+</div>
+
+<div class="image-modal" id="imageModal" onclick="this.style.display='none'">
+  <img id="modalImg">
+</div>
+
+<div class="instruction-modal" id="instructionModal" onclick="this.style.display='none'">
+  <div class="instruction-content" onclick="event.stopPropagation()">
+    <h2>Instructions</h2>
+    <p>Log in to the Intranet Slave</p>
+    <p>The credential used is on the teams</p>
+    <p>Go to ticketing_system database</p>
+    <p>Select the email table and search for the ticket number in the QueryID column</p>
+    <p>Download the result as XML</p>
+    <p>Select the note table and search for the ticket number in the QueryID column</p>
+    <p>Download the result as XML</p>
+    <p>Upload the result on the respected field</p>
+    <button onclick="document.getElementById('instructionModal').style.display='none'">Close</button>
+  </div>
+</div>
+
+<script>
+let records = [];
+let sortAsc = false;
+
+function toggleMode(){
+  document.body.classList.toggle('light-mode');
+}
+
+function openInstructionModal(){
+  document.getElementById('instructionModal').style.display='flex';
+}
+
+function openImageModal(src){
+  document.getElementById('modalImg').src = src;
+  document.getElementById('imageModal').style.display = 'flex';
+}
+
+// Sort logic
+function sortByDate(){
+  sortAsc = !sortAsc;
+  records.sort((a,b)=>{
+    let da = a.CreationDateTime || a.NoteDateTime;
+    let db = b.CreationDateTime || b.NoteDateTime;
+    return sortAsc ? new Date(da) - new Date(db) : new Date(db) - new Date(da);
+  });
+  renderList(records);
+}
+
+// Type icon
+function getTypeIcon(type){
+  if(type==='Note') return '📝';
+  if(type==='Email') return '✉️';
+  if(type==='Escalation') return '⚠️';
+  return '';
+}
+
+// Preview
+function showPreview(row){
+  if(row.Type==='Note'){
+    document.getElementById('previewSubject').textContent='Note by UserID:'+row.UserID;
+    document.getElementById('previewBodyHTML').textContent=row.NoteText;
+    document.getElementById('fromRow').style.display='none';
+    document.getElementById('toRow').style.display='none';
+    document.getElementById('ccRow').style.display='none';
+    document.getElementById('bccRow').style.display='none';
+    document.getElementById('previewUserIDRow').style.display='block';
+    document.getElementById('previewUserID').textContent=row.UserID;
+  } else {
+    document.getElementById('previewSubject').textContent=row.Subject;
+    document.getElementById('fromRow').style.display='block';
+    document.getElementById('toRow').style.display='block';
+    document.getElementById('ccRow').style.display=row.CC && row.CC.trim()!==""?'block':'none';
+    document.getElementById('bccRow').style.display=row.BCC && row.BCC.trim()!==""?'block':'none';
+    document.getElementById('previewFrom').textContent=row.From||'';
+    document.getElementById('previewTo').textContent=row.To||'';
+    document.getElementById('previewCC').textContent=row.CC||'';
+    document.getElementById('previewBCC').textContent=row.BCC||'';
+    document.getElementById('previewUserIDRow').style.display='none';
+    let bodyHTML=row.BodyHTML||"";
+    bodyHTML=bodyHTML.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'');
+    document.getElementById('previewBodyHTML').innerHTML=bodyHTML;
+    const imgs=document.getElementById('previewBodyHTML').querySelectorAll('img');
+    imgs.forEach(img=>{img.ondblclick=()=>openImageModal(img.src);});
+  }
+}
+
+// Render list
+function renderList(data){
+  const tbody=document.querySelector('#recordTable tbody');
+  tbody.innerHTML='';
+  data.forEach(row=>{
+    const tr=document.createElement('tr');
+    const dateTd=document.createElement('td'); dateTd.textContent=row.CreationDateTime||row.NoteDateTime;
+    const subjectTd=document.createElement('td');
+    subjectTd.textContent=row.Type==='Note'?(row.NoteText.length>100 ? row.NoteText.substring(0,100)+'...' : row.NoteText):row.Subject;
+    const typeTd=document.createElement('td'); typeTd.textContent=getTypeIcon(row.Type)+' '+row.Type;
+    const dirTd=document.createElement('td'); dirTd.textContent=row.Direction||row.Type;
+    const contactTd=document.createElement('td'); contactTd.textContent=row.ContactID||'';
+    const userTd=document.createElement('td'); userTd.textContent=row.Type==='Note'?row.UserID:'';
+    const fromTd=document.createElement('td'); fromTd.textContent=row.From||'';
+    tr.appendChild(dateTd); tr.appendChild(subjectTd); tr.appendChild(typeTd);
+    tr.appendChild(dirTd); tr.appendChild(contactTd); tr.appendChild(userTd); tr.appendChild(fromTd);
+    tr.onclick=()=>showPreview(row);
+    tbody.appendChild(tr);
+  });
+}
+
+// Parse XML
+function parseXML(file, type){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const xml=new DOMParser().parseFromString(e.target.result,'text/xml');
+    const rows=[...xml.getElementsByTagName('table')].filter(t=>t.getAttribute('name')===type);
+    const parsed=rows.map(t=>{
+      const obj={};
+      [...t.getElementsByTagName('column')].forEach(c=>{
+        obj[c.getAttribute('name')]=c.textContent;
+      });
+      obj.Type = type==='Email' ? obj.Type || 'Email' : 'Note';
+      return obj;
+    });
+    if(type==='Email'){ emailRecords=parsed; } else { noteRecords=parsed; }
+    mergeAndRender();
+  };
+  reader.readAsText(file);
+}
+
+let emailRecords=[], noteRecords=[];
+function mergeAndRender(){
+  if(emailRecords.length>0 && noteRecords.length>0){
+    const emailQuery=emailRecords[0].QueryID;
+    const noteQuery=noteRecords[0].QueryID;
+    if(emailQuery!==noteQuery){ alert('QueryID mismatch!'); return; }
+  }
+  records=[...emailRecords,...noteRecords];
+  records.sort((a,b)=>new Date(b.CreationDateTime||b.NoteDateTime)-new Date(a.CreationDateTime||a.NoteDateTime));
+  document.getElementById('queryIDHeader').textContent='QueryID: '+(records[0]?.QueryID||'');
+  renderList(records);
+}
+
+document.getElementById('emailFile').addEventListener('change',e=>parseXML(e.target.files[0],'Email'));
+document.getElementById('noteFile').addEventListener('change',e=>parseXML(e.target.files[0],'Note'));
+
+// Resizer logic
+const resizer=document.getElementById('resizer');
+const preview=document.getElementById('preview');
+let isResizing=false;
+resizer.addEventListener('mousedown',e=>{isResizing=true;document.body.style.userSelect='none';});
+document.addEventListener('mousemove',e=>{ if(!isResizing) return;
+  const mainRect=document.getElementById('main').getBoundingClientRect();
+  let newHeight=mainRect.bottom-e.clientY;
+  if(newHeight<100) newHeight=100;
+  if(newHeight>window.innerHeight*0.7) newHeight=window.innerHeight*0.7;
+  preview.style.height=newHeight+'px';
+});
+document.addEventListener('mouseup',()=>{isResizing=false;document.body.style.userSelect='auto';});
+</script>
+</body>
+</html>
