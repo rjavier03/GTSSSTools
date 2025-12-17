@@ -117,6 +117,9 @@
     cursor:row-resize;
     background:var(--border);
   }
+  tr.selected {
+  background: rgba(125,211,252,0.3) !important;
+}
   #preview{
     height:200px;
     min-height:100px;
@@ -300,6 +303,8 @@ function showPreview(row){
 }
 
 // Render list
+let selectedRow=null;
+
 function renderList(data){
   const tbody=document.querySelector('#recordTable tbody');
   tbody.innerHTML='';
@@ -315,10 +320,18 @@ function renderList(data){
     const fromTd=document.createElement('td'); fromTd.textContent=row.From||'';
     tr.appendChild(dateTd); tr.appendChild(subjectTd); tr.appendChild(typeTd);
     tr.appendChild(dirTd); tr.appendChild(contactTd); tr.appendChild(userTd); tr.appendChild(fromTd);
-    tr.onclick=()=>showPreview(row);
+
+    tr.onclick=()=>{
+      showPreview(row);
+      if(selectedRow) selectedRow.classList.remove('selected');
+      tr.classList.add('selected');
+      selectedRow=tr;
+    };
+
     tbody.appendChild(tr);
   });
 }
+
 
 // Parse XML
 function parseXML(file, type){
