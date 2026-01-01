@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>New Ticket Notifier Generator</title>
+    <style>
+         :root {
+            --bg: #071025;
+            --panel: #0b1220;
+            --muted: #94a3b8;
+            --accent: #7dd3fc;
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #e6eef6;
+            --output-bg: #020617;
+            --note-bg: #0e182e;
+        }
+        
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            background: linear-gradient(180deg, var(--bg), #071a2a);
+            color: var(--text);
+            font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial
+        }
+        
+        .wrap {
+            max-width: 880px;
+            margin: 40px auto;
+            padding: 24px;
+            background: var(--panel);
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(2, 6, 23, .6);
+            border: 1px solid var(--border);
+        }
+        
+        h1 {
+            margin: 0 0 10px;
+            font-size: 18px;
+            color: var(--accent)
+        }
+        
+        p.lead {
+            margin: 0 0 16px;
+            color: var(--muted);
+            font-size: 13px
+        }
+        
+        input[type="number"] {
+            width: 80px;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #031022;
+            color: var(--text);
+            font-family: ui-monospace, monospace;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        
+        button {
+            background: linear-gradient(180deg, #0b1220, #071022);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        button.primary {
+            background: linear-gradient(180deg, #007b8f, #006a7a);
+            font-weight: 600
+        }
+        
+        .block {
+            background: var(--output-bg);
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid var(--border);
+            font-family: ui-monospace, monospace;
+            font-size: 13px;
+            color: #cdeffc;
+            white-space: pre-wrap;
+            min-height: 200px;
+            margin-top: 12px;
+        }
+        
+        .label {
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 8px;
+            font-size: 14px
+        }
+        
+        .row {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+            align-items: center
+        }
+        
+        .instructions {
+            background: var(--note-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 28px;
+            font-size: 13px;
+            color: #d4e2f0;
+            line-height: 1.6;
+        }
+        
+        .instructions h2 {
+            color: var(--accent);
+            font-size: 15px;
+            margin: 0 0 6px;
+        }
+        
+        .instructions code {
+            background: #020b1a;
+            padding: 2px 4px;
+            border-radius: 4px;
+            color: #aefaff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <h1>New Ticket Notifier</h1>
+        <p class="lead">Enter the ticket check interval (in seconds) and generate code for DevTools.</p>
+
+        <div class="row">
+            <label for="checkInterval" class="label">Check interval (seconds):</label>
+            <input type="number" id="checkInterval" value="30" min="1">
+            <button class="primary" id="generateBtn">Generate Code</button>
+            <button id="copyBtn">Copy Code</button>
+        </div>
+
+        <div class="block" id="generatedCode">// Generated code will appear here</div>
+
+        <div class="instructions">
+            <h2>Instructions</h2>
+            <ol>
+                <li>Generate the code</li>
+                <li>Fill the input for how many seconds the ticketing auto-checks</li>
+                <li>Copy the generated code</li>
+                <li>Open Developer Tools on the ticketing page</li>
+                <li>Right click → Inspect → Console tab → Paste the code</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const generateBtn = document.getElementById("generateBtn");
+        const copyBtn = document.getElementById("copyBtn");
+        const codeBlock = document.getElementById("generatedCode");
+
+        generateBtn.addEventListener("click", () => {
+            const intervalSec = parseFloat(document.getElementById("checkInterval").value);
+            if (isNaN(intervalSec) || intervalSec <= 0) {
+                alert("Please enter a valid number of seconds (>=1)");
+                return;
+            }
+
+            const CHECK_INTERVAL = intervalSec * 1000; // Convert to milliseconds
+            const REFRESH_DELAY = 3000; // Fixed 3 seconds
+
+            const code = `// ===== CONFIG =====
+const CHECK_INTERVAL = ${CHECK_INTERVAL};
+const REFRESH_DELAY = ${REFRESH_DELAY}; // wait for AJAX to finish
+const TICKET_SELECTOR =
+  '.yui-dt0-col-QueryID.yui-dt-col-QueryID.yui-dt-sortable';
+const TICKET_URL =
+  'https://intranet.b2be.com/ticketing_system/Interface/DetailedView.php?id=';
+
+// ===== STATE =====
+let previousTicketIDs = null;
+
+// ===== PERMISSION =====
+if ("Notification" in window && Notification.permission !== "granted") {
+    Notification.requestPermission();
+}
+
+// ===== CORE =====
+function refreshAndCheck() {
+    // Only run if Tab 1 is active
+    const tab1Li = document.querySelector('.yui-nav li a[href="#tab1"]')?.parentElement;
+    if (!tab1Li || !tab1Li.classList.contains('selected')) {
+        console.log("Tab1 is not active, skipping refresh");
+        return;
+    }
+
+    console.log("Refreshing ticket tables...");
+    try {
+        MainWindowUpdate();
+        ActionTableUpdate();
+        MemoTableUpdate();
+    } catch (e) {
+        console.warn("Refresh functions not available yet");
+    }
+
+    setTimeout(checkTickets, REFRESH_DELAY);
+}
+
+function checkTickets() {
+    const currentTicketIDs = [...document.querySelectorAll(TICKET_SELECTOR)]
+        .slice(1)
+        .map(el => el.textContent.trim())
+        .filter(Boolean);
+
+    if (previousTicketIDs === null) {
+        previousTicketIDs = currentTicketIDs;
+        console.log("Baseline set:", currentTicketIDs);
+        return;
+    }
+
+    const newTickets = currentTicketIDs.filter(
+        id => !previousTicketIDs.includes(id)
+    );
+
+    newTickets.forEach(id => {
+        if (Notification.permission === "granted") {
+            const n = new Notification("New Ticket Created", {
+                body: \`Ticket ID: \${id}\`,
+                silent: false
+            });
+
+            n.onclick = () => {
+                window.open(TICKET_URL + encodeURIComponent(id), "_blank");
+                window.focus();
+            };
+        }
+        console.log("New Ticket:", id);
+    });
+
+    previousTicketIDs = currentTicketIDs;
+}
+
+// ===== START =====
+refreshAndCheck();
+setInterval(refreshAndCheck, CHECK_INTERVAL);`;
+
+            codeBlock.textContent = code;
+        });
+
+        // Copy code to clipboard
+        copyBtn.addEventListener("click", () => {
+            navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+                alert("Code copied to clipboard!");
+            }).catch(err => {
+                alert("Failed to copy code: " + err);
+            });
+        });
+    </script>
+</body>
+
+</html>
