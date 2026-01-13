@@ -87,68 +87,79 @@ input.locked{ background:#1e293b; color:#64748b; }
 <div id="instructions"></div>
 </div>
 
-<script src="devlist.js"></script>
 <script>
-/* --- Existing Developer Dropdown Logic --- */
-const devInput=document.getElementById("devName");
-const dropdown=document.getElementById("devDropdown");
-let currentFiltered=[];
-let highlightedIndex=0;
+const API_URL = "https://toyodora.xo.je/API/developer_api.php"; // replace with your API URL
 
-// Load localStorage additional names
-let storedDevs = JSON.parse(localStorage.getItem("customDevs")||"[]");
-let allDevs = devNames.concat(storedDevs);
+/* --- Developer Dropdown using API --- */
+const devInput = document.getElementById("devName");
+const dropdown = document.getElementById("devDropdown");
+let allDevs = [];
+let currentFiltered = [];
+let highlightedIndex = 0;
 
-function renderDropdown(){
-  dropdown.innerHTML="";
-  currentFiltered.forEach((name,index)=>{
-    const item=document.createElement("div");
-    item.className="dropdown-item"+(index===highlightedIndex?" highlight":"");
-    item.textContent=name;
-    item.addEventListener("click",()=>selectName(name));
-    dropdown.appendChild(item);
-  });
-  dropdown.classList.add("active");
+// Fetch all developers from API on load
+async function loadDevelopers() {
+    try {
+        const res = await fetch(`${API_URL}?limit=all`);
+        console.log("Fetch status:", res.status); // Logs HTTP status (200, 403, etc.)
+        const json = await res.json();
+        console.log("API response:", json);      // Logs whatever the API actually returned
+        allDevs = json.map(d => d.DeveloperName); // Extract names if API returned array of objects
+    } catch (err) {
+        console.error("Failed to load developers:", err);
+        allDevs = [];
+    }
 }
 
-function selectName(name){
-  devInput.value=name;
-  dropdown.classList.remove("active");
-  updateOutput();
+function renderDropdown() {
+    dropdown.innerHTML = "";
+    currentFiltered.forEach((name, index) => {
+        const item = document.createElement("div");
+        item.className = "dropdown-item" + (index === highlightedIndex ? " highlight" : "");
+        item.textContent = name;
+        item.addEventListener("click", () => selectName(name));
+        dropdown.appendChild(item);
+    });
+    dropdown.classList.add("active");
 }
 
-function showDropdown(filter=""){
-  allDevs = devNames.concat(JSON.parse(localStorage.getItem("customDevs")||"[]"));
-  currentFiltered = allDevs.filter(n=>n.toLowerCase().includes(filter.toLowerCase()));
-  if(currentFiltered.length===0){dropdown.classList.remove("active"); return;}
-  highlightedIndex=0;
-  renderDropdown();
+function selectName(name) {
+    devInput.value = name;
+    dropdown.classList.remove("active");
+    updateOutput();
 }
 
-devInput.addEventListener("input",e=>{
-  const val=e.target.value.trim();
-  if(val==="") dropdown.classList.remove("active");
-  else showDropdown(val);
-  updateOutput();
+function showDropdown(filter="") {
+    currentFiltered = allDevs.filter(n => n.toLowerCase().includes(filter.toLowerCase()));
+    if(currentFiltered.length === 0){ dropdown.classList.remove("active"); return; }
+    highlightedIndex = 0;
+    renderDropdown();
+}
+
+devInput.addEventListener("input", e => {
+    const val = e.target.value.trim();
+    if(val === "") dropdown.classList.remove("active");
+    else showDropdown(val);
+    updateOutput();
 });
-devInput.addEventListener("focus",()=>showDropdown(devInput.value));
-document.addEventListener("click",e=>{ if(!e.target.closest(".dropdown-container")) dropdown.classList.remove("active"); });
-devInput.addEventListener("keydown",e=>{
-  if(!dropdown.classList.contains("active")||currentFiltered.length===0) return;
-  if(["ArrowDown","ArrowRight"].includes(e.key)){
-    e.preventDefault();
-    highlightedIndex=(highlightedIndex+1)%currentFiltered.length;
-    renderDropdown();
-  } else if(["ArrowUp","ArrowLeft"].includes(e.key)){
-    e.preventDefault();
-    highlightedIndex=(highlightedIndex-1+currentFiltered.length)%currentFiltered.length;
-    renderDropdown();
-  } else if(e.key==="Enter"){
-    e.preventDefault();
-    selectName(currentFiltered[highlightedIndex]);
-  } else if(e.key==="Tab"){
-    if(currentFiltered.length>0){ e.preventDefault(); selectName(currentFiltered[0]); }
-  }
+devInput.addEventListener("focus", () => showDropdown(devInput.value));
+document.addEventListener("click", e => { if(!e.target.closest(".dropdown-container")) dropdown.classList.remove("active"); });
+devInput.addEventListener("keydown", e => {
+    if(!dropdown.classList.contains("active") || currentFiltered.length === 0) return;
+    if(["ArrowDown","ArrowRight"].includes(e.key)){
+        e.preventDefault();
+        highlightedIndex=(highlightedIndex+1)%currentFiltered.length;
+        renderDropdown();
+    } else if(["ArrowUp","ArrowLeft"].includes(e.key)){
+        e.preventDefault();
+        highlightedIndex=(highlightedIndex-1+currentFiltered.length)%currentFiltered.length;
+        renderDropdown();
+    } else if(e.key==="Enter"){
+        e.preventDefault();
+        selectName(currentFiltered[highlightedIndex]);
+    } else if(e.key==="Tab"){
+        if(currentFiltered.length>0){ e.preventDefault(); selectName(currentFiltered[0]); }
+    }
 });
 
 /* --- Reasons --- */
@@ -191,7 +202,6 @@ function updateRejectedField(){
     rejectedInput.classList.remove("locked");
   }
 }
-
 [devInput,translationInput,rejectedInput].forEach(el=>{
   el.addEventListener("input",updateOutput);
   el.addEventListener("change",updateOutput);
@@ -244,24 +254,40 @@ document.getElementById("copyBtn").addEventListener("click",()=>{
   });
 });
 
-/* --- Add Name Button --- */
+/* --- Add Name via API --- */
 const addNameBtn=document.getElementById("addNameBtn");
 const newDevInput=document.getElementById("newDevName");
 
-addNameBtn.addEventListener("click",()=>{
+addNameBtn.addEventListener("click", async ()=>{
   const newName=newDevInput.value.trim();
   if(!newName) return;
-  let stored = JSON.parse(localStorage.getItem("customDevs")||"[]");
-  if(!stored.includes(newName)){
-    stored.push(newName);
-    localStorage.setItem("customDevs", JSON.stringify(stored));
-    allDevs.push(newName);
-    alert(`Developer "${newName}" added locally!`);
-    newDevInput.value="";
+
+  try {
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ DeveloperName: newName })
+    });
+    const data = await res.json();
+    if(data.message){
+      allDevs.push(newName); // add to dropdown
+      alert(`Developer "${newName}" added via API!`);
+      newDevInput.value="";
+    } else if(data.error){
+      alert("Error: "+data.error);
+    }
+  } catch(err){
+    console.error(err);
+    alert("Failed to add developer via API");
   }
+  updateOutput();
 });
-updateRejectedField();
-updateOutput();
+
+/* --- Initialize --- */
+loadDevelopers().then(()=>{
+  updateRejectedField();
+  updateOutput();
+});
 </script>
 </body>
 </html>
