@@ -26,4 +26,12 @@ echo Doc >> "%outFile%"
 powershell -NoProfile -Command "Get-ChildItem *.confirmed | ForEach-Object { $content = Get-Content $_.FullName -Raw; if ($content -match '<DocID>(.*?)</DocID>') { $matches[1] } }" >> "%outFile%"
 
 echo [DONE] Check %outFile%
+
+:: =========================
+:: DELETE CONFIRMED FILES
+:: =========================
+echo [LOG] Deleting .confirmed files...
+del /q *.confirmed
+
+echo [DONE] Cleanup completed.
 pause

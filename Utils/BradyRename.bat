@@ -15,17 +15,8 @@ for %%F in (*.pdf) do (
     set "name=%%~nF"
     set "ext=%%~xF"
 
-    :: Reset field counter
-    set i=0
-
-    :: Extract 3rd field (PO number)
-    for %%A in (!name!) do (
-        set /a i+=1
-        if !i! EQU 3 set "po=%%A"
-    )
-
-    :: Build new filename
-    set "newname=%prefix%_!po!_!counter!!ext!"
+    :: Use full filename as-is (no splitting)
+    set "newname=%prefix%_!name!_!counter!!ext!"
 
     :: Rename file first
     ren "%%F" "!newname!"
