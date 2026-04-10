@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>PDF Workflow Tool</title>
+
+    <style>
+         :root {
+            --bg: #071025;
+            --panel: #0b1220;
+            --muted: #94a3b8;
+            --accent: #7dd3fc;
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #e6eef6;
+        }
+        
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            background: linear-gradient(180deg, var(--bg), #071a2a);
+            color: var(--text);
+            font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial;
+        }
+        
+        .wrap {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 24px;
+            background: var(--panel);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 8px 30px rgba(2, 6, 23, .6);
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+        }
+        
+        header h1 {
+            color: var(--accent);
+            margin: 0;
+            font-size: 22px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+        
+        .step {
+            background: #031022;
+            border: 1px solid var(--border);
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 14px;
+        }
+        
+        .step h3 {
+            color: var(--accent);
+            margin: 0 0 8px 0;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #020617;
+            color: var(--text);
+            font-family: monospace;
+            box-sizing: border-box;
+            margin-top: 6px;
+        }
+        
+        button {
+            margin-top: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: linear-gradient(180deg, #0b1220, #071022);
+            color: var(--text);
+        }
+        
+        button.primary {
+            background: linear-gradient(180deg, #007b8f, #006a7a);
+            font-weight: bold;
+        }
+        
+        button.copy {
+            color: var(--accent);
+        }
+        
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="wrap">
+
+        <header>
+            <h1>PDF Workflow Tool</h1>
+            <div style="color:var(--muted);font-size:13px">End-to-End Processing Flow</div>
+        </header>
+
+        <div class="grid">
+
+            <!-- LEFT SIDE (STEP 1–3) -->
+            <div>
+
+                <div class="step">
+                    <h3>Step 1 - Download → Extract → Run BAT</h3>
+                    <p>
+                        1. Search SenderUserID in V2<br> 2. Download "Download - Initiated"<br> 3. Extract ZIP<br> 4. Run BAT file
+                    </p>
+                    <a href="Utils/ExtractID.bat" download style="color:var(--accent)">
+                        Download BAT File
+                    </a> </div>
+
+                <div class="step">
+                    <h3>Step 2 - Paste Extracted IDs</h3>
+
+                    <textarea id="idsInput" rows="6"></textarea>
+
+                    <button class="primary" onclick="generateQuery()">Generate SQL Query</button>
+                    <button onclick="copyQuery()">Copy Query</button>
+
+                    <textarea id="queryOutput" rows="6" readonly></textarea>
+                </div>
+
+                <div class="step">
+                    <h3>Step 3 - Run SQL in Phoenix DB</h3>
+                    <p>
+                        Server: Phoenix PROD - Paris:3306<br> Database: phoenix<br> Table: MessageAttribute
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- RIGHT SIDE (STEP 4–7) -->
+            <div>
+
+                <!-- STEP 4 (MERGED AS REQUESTED) -->
+                <div class="step">
+                    <h3>Step 4 - Open Phoenix Results</h3>
+
+                    <textarea id="resultInput" rows="6">
+
+    </textarea>
+
+                    <button class="primary" onclick="openPhoenix()">OpenPhoenix</button>
+
+
+                </div>
+
+                <div class="step">
+
+                    <h3>Step 5 - Open Parent Phoenix</h3>
+                    <p style="color:var(--muted);margin-top:10px">
+                        Open each MessageID → download PDF from Phoenix
+                    </p>
+
+                </div>
+
+
+
+                <div class="step">
+                    <h3>Step 6 - Rename PDFs (Optional)</h3>
+                    <p>
+                        Run BAT file to automatically rename downloaded PDFs
+                    </p>
+                    <a href="Utils/BradyRename.bat" style="color:var(--accent)">Download Rename BAT</a>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        function generateQuery() {
+            let input = document.getElementById("idsInput").value.trim();
+            let ids = input.split(/\s+/).filter(x => x);
+
+            if (!ids.length) return alert("No IDs found");
+
+            let inClause = ids.map(id => `'${id}'`).join(",");
+
+            let query =
+                `SELECT MIN(MessageID) AS MessageID
+FROM MessageAttribute
+WHERE \`Key\` = 'V2DocumentInternalID'
+AND \`Value\` IN (${inClause})
+GROUP BY \`Value\`;`;
+
+            document.getElementById("queryOutput").value = query;
+        }
+
+        function copyQuery() {
+            let text = document.getElementById("queryOutput");
+            text.select();
+            document.execCommand("copy");
+            alert("Query copied!");
+        }
+
+        function openPhoenix() {
+            let input = document.getElementById("resultInput").value.trim();
+            let ids = input.split(/\s+/).filter(x => x);
+
+            if (!ids.length) return alert("No results found");
+
+            let i = 0;
+
+            function openNext() {
+                if (i >= ids.length) return;
+
+                window.open(
+                    "https://phoenix-03.b2be.com/nest/messages/index/" + ids[i],
+                    "_blank"
+                );
+
+                i++;
+                setTimeout(openNext, 300);
+            }
+
+            openNext();
+        }
+    </script>
+
+</body>
+
+</html>
