@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
@@ -68,7 +69,8 @@
             margin: 0 0 8px 0;
         }
         
-        textarea {
+        textarea,
+        input {
             width: 100%;
             padding: 10px;
             border-radius: 8px;
@@ -95,16 +97,13 @@
             font-weight: bold;
         }
         
-        button.copy {
-            color: var(--accent);
-        }
-        
-        @media (max-width: 900px) {
+        @media (max-width:900px) {
             .grid {
                 grid-template-columns: 1fr;
             }
         }
     </style>
+
 </head>
 
 <body>
@@ -118,82 +117,104 @@
 
         <div class="grid">
 
-            <!-- LEFT SIDE (STEP 1–3) -->
             <div>
 
                 <div class="step">
-                    <h3>Step 1 - Download → Extract → Run BAT</h3>
-                    <p>
-                        1. Search SenderUserID in V2<br> 2. Download "Download - Initiated"<br> 3. Extract ZIP<br> 4. Run BAT file
-                    </p>
-                    <a href="Utils/ExtractID.bat" download style="color:var(--accent)">
-                        Download BAT File
-                    </a> </div>
+                    <h3>Step 1 - B2BE Server Query</h3>
 
-                <div class="step">
-                    <h3>Step 2 - Paste Extracted IDs</h3>
+                    <input id="b2beServerInput" placeholder="Enter SenderB2BEUserID">
 
-                    <textarea id="idsInput" rows="6"></textarea>
+                    <button class="primary" onclick="generateServerQuery()">Generate Query</button>
 
-                    <button class="primary" onclick="generateQuery()">Generate SQL Query</button>
-                    <button onclick="copyQuery()">Copy Query</button>
+                    <textarea id="serverQueryOutput" rows="5" readonly></textarea>
 
-                    <textarea id="queryOutput" rows="6" readonly></textarea>
                 </div>
 
                 <div class="step">
-                    <h3>Step 3 - Run SQL in Phoenix DB</h3>
+                    <h3>Step 2 - Download → Extract → Run BAT</h3>
+                    <p>
+                        1. Search SenderUserID in V2<br> 2. Download "Download - Initiated"<br> 3. Extract ZIP<br> 4. Run BAT file
+                    </p>
+
+                    <a href="Utils/ExtractID.bat" download style="color:var(--accent)">
+Download BAT File
+</a>
+                </div>
+
+                <div class="step">
+                    <h3>Step 3 - Paste Extracted IDs</h3>
+
+                    <textarea id="idsInput" rows="6"></textarea>
+
+                    <button class="primary" onclick="generateQuery()">Generate SQL Query</button> <button onclick="copyQuery()">Copy Query</button>
+
+                    <textarea id="queryOutput" rows="8" readonly></textarea>
+
+                </div>
+
+            </div>
+
+            <div>
+
+                <div class="step">
+                    <h3>Step 4 - Run SQL in Phoenix DB</h3>
                     <p>
                         Server: Phoenix PROD - Paris:3306<br> Database: phoenix<br> Table: MessageAttribute
                     </p>
                 </div>
 
-            </div>
-
-            <!-- RIGHT SIDE (STEP 4–7) -->
-            <div>
-
-                <!-- STEP 4 (MERGED AS REQUESTED) -->
                 <div class="step">
-                    <h3>Step 4 - Open Phoenix Results</h3>
+                    <h3>Step 5 - Open Phoenix Results</h3>
 
-                    <textarea id="resultInput" rows="6">
-
-    </textarea>
+                    <textarea id="resultInput" rows="6"></textarea>
 
                     <button class="primary" onclick="openPhoenix()">OpenPhoenix</button>
 
-
                 </div>
 
                 <div class="step">
-
-                    <h3>Step 5 - Open Parent Phoenix</h3>
+                    <h3>Step 6 - Open Parent Phoenix</h3>
                     <p style="color:var(--muted);margin-top:10px">
                         Open each MessageID → download PDF from Phoenix
                     </p>
-
                 </div>
 
-
-
                 <div class="step">
-                    <h3>Step 6 - Rename PDFs (Optional)</h3>
-                    <p>
-                        Run BAT file to automatically rename downloaded PDFs
-                    </p>
-                    <a href="Utils/BradyRename.bat" style="color:var(--accent)">Download Rename BAT</a>
+                    <h3>Step 7 - Rename PDFs (Optional)</h3>
+                    <p>Run BAT file to automatically rename downloaded PDFs</p>
+                    <a href="Utils/BradyRename.bat" style="color:var(--accent)">
+Download Rename BAT
+</a>
                 </div>
 
             </div>
 
         </div>
-
     </div>
 
     <script>
+        function generateServerQuery() {
+
+            let val = document.getElementById("b2beServerInput").value.trim();
+
+            if (!val) return alert("Enter SenderB2BEUserID");
+
+            let query =
+                `SELECT \`PrimaryDocumentID\`
+FROM \`B2BE_DOCUMENT\`
+WHERE \`DateTime\` >= '2025-04-10 00:00:00'
+AND \`DateTime\` <= '2026-04-10 23:59:59'
+AND \`SenderB2BEUserID\` = '${val}'
+LIMIT 10;`;
+
+            document.getElementById("serverQueryOutput").value = query;
+
+        }
+
         function generateQuery() {
+
             let input = document.getElementById("idsInput").value.trim();
+
             let ids = input.split(/\s+/).filter(x => x);
 
             if (!ids.length) return alert("No IDs found");
@@ -201,24 +222,37 @@
             let inClause = ids.map(id => `'${id}'`).join(",");
 
             let query =
-                `SELECT MIN(MessageID) AS MessageID
-FROM MessageAttribute
-WHERE \`Key\` = 'V2DocumentInternalID'
-AND \`Value\` IN (${inClause})
-GROUP BY \`Value\`;`;
+                `SELECT mc.MessageID
+FROM (
+    SELECT MIN(MessageID) AS MessageID
+    FROM MessageAttribute
+    WHERE \`Key\` = 'V2DocumentInternalID'
+    AND \`Value\` IN (${inClause})
+    GROUP BY \`Value\`
+) ma
+JOIN MessageChild mc
+ON ma.MessageID = mc.ChildMessageID;`;
 
             document.getElementById("queryOutput").value = query;
+
         }
 
         function copyQuery() {
+
             let text = document.getElementById("queryOutput");
+
             text.select();
+
             document.execCommand("copy");
+
             alert("Query copied!");
+
         }
 
         function openPhoenix() {
+
             let input = document.getElementById("resultInput").value.trim();
+
             let ids = input.split(/\s+/).filter(x => x);
 
             if (!ids.length) return alert("No results found");
@@ -226,6 +260,7 @@ GROUP BY \`Value\`;`;
             let i = 0;
 
             function openNext() {
+
                 if (i >= ids.length) return;
 
                 window.open(
@@ -234,10 +269,13 @@ GROUP BY \`Value\`;`;
                 );
 
                 i++;
+
                 setTimeout(openNext, 300);
+
             }
 
             openNext();
+
         }
     </script>
 
