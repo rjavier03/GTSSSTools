@@ -126,8 +126,9 @@
 
                     <button class="primary" onclick="generateServerQuery()">Generate Query</button>
 
-                    <textarea id="serverQueryOutput" rows="5" readonly></textarea>
+                    <button onclick="copyServerQuery()">Copy Query</button>
 
+                    <textarea id="serverQueryOutput" rows="5" readonly></textarea>
                 </div>
 
                 <div class="step">
@@ -199,13 +200,15 @@ Download Rename BAT
 
             if (!val) return alert("Enter SenderB2BEUserID");
 
-            let query =
-                `SELECT \`PrimaryDocumentID\`
+            let query = `
+SELECT \`PrimaryDocumentID\`
 FROM \`B2BE_DOCUMENT\`
 WHERE \`DateTime\` >= '2025-04-10 00:00:00'
-AND \`DateTime\` <= '2026-04-10 23:59:59'
-AND \`SenderB2BEUserID\` = '${val}'
-LIMIT 10;`;
+  AND \`DateTime\` <= '2026-04-10 23:59:59'
+  AND \`SenderB2BEUserID\` = '${val}'
+ORDER BY \`DateTime\` DESC
+LIMIT 10;
+`;
 
             document.getElementById("serverQueryOutput").value = query;
 
@@ -276,6 +279,19 @@ ON ma.MessageID = mc.ChildMessageID;`;
 
             openNext();
 
+
+        }
+
+        function copyServerQuery() {
+
+            let text = document.getElementById("serverQueryOutput");
+
+            if (!text.value.trim()) return alert("No query to copy");
+
+            text.select();
+            document.execCommand("copy");
+
+            alert("Server query copied!");
         }
     </script>
 
