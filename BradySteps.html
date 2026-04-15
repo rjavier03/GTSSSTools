@@ -201,7 +201,7 @@ Download Rename BAT
             if (!val) return alert("Enter SenderB2BEUserID");
 
             let query = `
-SELECT \`PrimaryDocumentID\`
+SELECT \`B2BEDocumentInternalID\`
 FROM \`B2BE_DOCUMENT\`
 WHERE \`DateTime\` >= '2025-04-10 00:00:00'
   AND \`DateTime\` <= '2026-04-10 23:59:59'
