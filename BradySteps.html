@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
@@ -48,6 +47,8 @@
             color: var(--accent);
             margin: 0;
             font-size: 22px;
+            cursor: pointer;
+            user-select: none;
         }
         
         .grid {
@@ -97,202 +98,264 @@
             font-weight: bold;
         }
         
+        #waitingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 32px;
+            z-index: 9999;
+            text-align: center;
+        }
+        
+        #codeModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        
+        #codeModal div {
+            background: #0b1220;
+            padding: 30px;
+            border-radius: 10px;
+            border: 1px solid var(--accent);
+            text-align: center;
+        }
+        
         @media (max-width:900px) {
             .grid {
                 grid-template-columns: 1fr;
             }
         }
     </style>
-
 </head>
 
 <body>
 
-    <div class="wrap">
+    <div id="waitingOverlay"></div>
 
+    <div id="codeModal">
+        <div>
+            <h3 style="margin-top:0">Bypass Protocol</h3>
+            <input type="password" id="codeInput" placeholder="Enter Code">
+            <br>
+            <button class="primary" onclick="checkCode()">Submit</button>
+            <button onclick="document.getElementById('codeModal').style.display='none'">Cancel</button>
+        </div>
+    </div>
+
+    <div class="wrap">
         <header>
-            <h1>PDF Workflow Tool</h1>
+            <h1 id="title">PDF Workflow Tool</h1>
             <div style="color:var(--muted);font-size:13px">End-to-End Processing Flow</div>
         </header>
 
         <div class="grid">
-
             <div>
-
                 <div class="step">
                     <h3>Step 1 - B2BE Server Query</h3>
-
                     <input id="b2beServerInput" placeholder="Enter SenderB2BEUserID">
-
                     <button class="primary" onclick="generateServerQuery()">Generate Query</button>
-
                     <button onclick="copyServerQuery()">Copy Query</button>
-
                     <textarea id="serverQueryOutput" rows="5" readonly></textarea>
                 </div>
 
                 <div class="step">
                     <h3>Step 2 - Download → Extract → Run BAT</h3>
-                    <p>
-                        1. Search SenderUserID in V2<br> 2. Download "Download - Initiated"<br> 3. Extract ZIP<br> 4. Run BAT file
-                    </p>
-
-                    <a href="Utils/ExtractID.bat" download style="color:var(--accent)">
-Download BAT File
-</a>
+                    <p>1. Search SenderUserID in V2<br>2. Download "Download - Initiated"<br>3. Extract ZIP<br>4. Run BAT file</p>
+                    <a href="Utils/ExtractID.bat" download style="color:var(--accent)">Download BAT File</a>
                 </div>
 
                 <div class="step">
                     <h3>Step 3 - Paste Extracted IDs</h3>
-
                     <textarea id="idsInput" rows="6"></textarea>
-
-                    <button class="primary" onclick="generateQuery()">Generate SQL Query</button> <button onclick="copyQuery()">Copy Query</button>
-
+                    <button class="primary" onclick="generateQuery()">Generate SQL Query</button>
+                    <button onclick="copyQuery()">Copy Query</button>
                     <textarea id="queryOutput" rows="8" readonly></textarea>
-
                 </div>
-
             </div>
 
             <div>
-
                 <div class="step">
                     <h3>Step 4 - Run SQL in Phoenix DB</h3>
-                    <p>
-                        Server: Phoenix PROD - Paris:3306<br> Database: phoenix<br> Table: MessageAttribute
-                    </p>
+                    <p>Server: Phoenix PROD - Paris:3306<br>Database: phoenix<br>Table: MessageAttribute</p>
                 </div>
 
                 <div class="step">
                     <h3>Step 5 - Open Phoenix Results</h3>
-
-                    <textarea id="resultInput" rows="6"></textarea>
-
-                    <button class="primary" onclick="openPhoenix()">OpenPhoenix</button>
-
+                    <textarea id="resultInput" rows="6" placeholder="Paste MessageIDs here..."></textarea>
+                    <button class="primary" onclick="openPhoenix()">Open Phoenix</button>
                 </div>
 
                 <div class="step">
                     <h3>Step 6 - Open Parent Phoenix</h3>
-                    <p style="color:var(--muted);margin-top:10px">
-                        Open each MessageID → download PDF from Phoenix
-                    </p>
+                    <p style="color:var(--muted);margin-top:10px">Open each MessageID → download PDF from Phoenix</p>
                 </div>
 
                 <div class="step">
                     <h3>Step 7 - Rename PDFs (Optional)</h3>
-                    <p>Run BAT file to automatically rename downloaded PDFs</p>
-                    <a href="Utils/BradyRename.bat" style="color:var(--accent)">
-Download Rename BAT
-</a>
+                    <a href="Utils/BradyRename.bat" style="color:var(--accent)">Download Rename BAT</a>
                 </div>
-
             </div>
-
         </div>
     </div>
 
     <script>
+        /* TOOL LOGIC */
         function generateServerQuery() {
-
             let val = document.getElementById("b2beServerInput").value.trim();
-
             if (!val) return alert("Enter SenderB2BEUserID");
-
-            let query = `
-SELECT \`PrimaryDocumentID\`
-FROM \`B2BE_DOCUMENT\`
-WHERE \`DateTime\` >= '2025-04-10 00:00:00'
-  AND \`DateTime\` <= '2026-04-10 23:59:59'
-  AND \`SenderB2BEUserID\` = '${val}'
-ORDER BY \`DateTime\` DESC
-LIMIT 10;
-`;
-
+            let query = `SELECT \`PrimaryDocumentID\` FROM \`B2BE_DOCUMENT\` WHERE \`DateTime\` >= '2025-04-10 00:00:00' AND \`DateTime\` <= '2026-04-10 23:59:59' AND \`SenderB2BEUserID\` = '${val}' ORDER BY \`DateTime\` DESC LIMIT 10;`;
             document.getElementById("serverQueryOutput").value = query;
-
         }
 
         function generateQuery() {
-
             let input = document.getElementById("idsInput").value.trim();
-
             let ids = input.split(/\s+/).filter(x => x);
-
             if (!ids.length) return alert("No IDs found");
-
             let inClause = ids.map(id => `'${id}'`).join(",");
-
-            let query =
-                `SELECT mc.MessageID
-FROM (
-    SELECT MIN(MessageID) AS MessageID
-    FROM MessageAttribute
-    WHERE \`Key\` = 'V2DocumentInternalID'
-    AND \`Value\` IN (${inClause})
-    GROUP BY \`Value\`
-) ma
-JOIN MessageChild mc
-ON ma.MessageID = mc.ChildMessageID;`;
-
+            let query = `SELECT mc.MessageID FROM (SELECT MIN(MessageID) AS MessageID FROM MessageAttribute WHERE \`Key\` = 'V2DocumentInternalID' AND \`Value\` IN (${inClause}) GROUP BY \`Value\`) ma JOIN MessageChild mc ON ma.MessageID = mc.ChildMessageID;`;
             document.getElementById("queryOutput").value = query;
-
         }
 
         function copyQuery() {
-
             let text = document.getElementById("queryOutput");
-
             text.select();
-
             document.execCommand("copy");
-
             alert("Query copied!");
-
         }
 
         function openPhoenix() {
-
             let input = document.getElementById("resultInput").value.trim();
-
             let ids = input.split(/\s+/).filter(x => x);
-
             if (!ids.length) return alert("No results found");
 
             let i = 0;
 
             function openNext() {
-
                 if (i >= ids.length) return;
-
-                window.open(
-                    "https://phoenix-03.b2be.com/nest/messages/index/" + ids[i],
-                    "_blank"
-                );
-
+                window.open("https://phoenix-03.b2be.com/nest/messages/index/" + ids[i], "_blank");
                 i++;
-
                 setTimeout(openNext, 300);
-
             }
-
             openNext();
-
-
         }
 
         function copyServerQuery() {
-
             let text = document.getElementById("serverQueryOutput");
-
             if (!text.value.trim()) return alert("No query to copy");
-
             text.select();
             document.execCommand("copy");
-
             alert("Server query copied!");
         }
+
+        /* STORAGE UTILS (Local Replacement for Cookies) */
+        const Storage = {
+            set: function(key, value, seconds) {
+                const item = {
+                    value: value,
+                    expiry: seconds ? Date.now() + (seconds * 1000) : null
+                };
+                localStorage.setItem(key, JSON.stringify(item));
+            },
+            get: function(key) {
+                const itemStr = localStorage.getItem(key);
+                if (!itemStr) return null;
+                const item = JSON.parse(itemStr);
+                if (item.expiry && Date.now() > item.expiry) {
+                    localStorage.removeItem(key);
+                    return null;
+                }
+                return item.value;
+            },
+            remove: function(key) {
+                localStorage.removeItem(key);
+            }
+        };
+
+        /* WAIT OVERLAY */
+        function startWaitingCountdown(seconds) {
+            let overlay = document.getElementById("waitingOverlay");
+            overlay.style.display = "flex";
+            let t = Math.ceil(seconds);
+            let int = setInterval(() => {
+                overlay.innerText = "System Cool-down active. \n\n" + t + "s remaining";
+                t--;
+                if (t < 0) {
+                    clearInterval(int);
+                    Storage.remove("WaitingTime");
+                    location.reload();
+                }
+            }, 1000);
+        }
+
+        /* BYPASS CHECK */
+        function checkCode() {
+            let val = document.getElementById("codeInput").value;
+            if (val === "LEWSOR") {
+                Storage.remove("WaitingTime");
+                Storage.set("BypassSession", "true", 86400); // 24 hour bypass
+                alert("Bypass enabled for this local machine!");
+                location.reload();
+            } else {
+                alert("Invalid code");
+            }
+        }
+
+        /* INITIALIZATION */
+        window.addEventListener("load", function() {
+            // 1. Secret Click Listener
+            let clicks = 0;
+            let timer;
+            document.getElementById("title").addEventListener("click", () => {
+                clicks++;
+                clearTimeout(timer);
+                timer = setTimeout(() => clicks = 0, 1000);
+                if (clicks === 3) {
+                    document.getElementById("codeModal").style.display = "flex";
+                    clicks = 0;
+                }
+            });
+
+            // 2. Wrap OpenPhoenix for penalty
+            if (typeof openPhoenix === "function") {
+                const originalOpenPhoenix = openPhoenix;
+                openPhoenix = function() {
+                    originalOpenPhoenix();
+                    if (!Storage.get("BypassSession")) {
+                        setTimeout(() => {
+                            Storage.set("WaitingTime", Date.now() + (30 * 1000), 30);
+                            location.reload();
+                        }, 10000);
+                    }
+                };
+            }
+
+            // 3. Check for active penalty
+            let waitData = Storage.get("WaitingTime");
+            if (waitData && !Storage.get("BypassSession")) {
+                let remaining = Math.floor((parseInt(waitData) - Date.now()) / 1000);
+                if (remaining > 0) {
+                    startWaitingCountdown(remaining);
+                } else {
+                    Storage.remove("WaitingTime");
+                }
+            }
+        });
     </script>
 
 </body>
