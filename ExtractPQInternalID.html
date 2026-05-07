@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>PDF Workflow Tool</title>
+
+    <style>
+         :root {
+            --bg: #071025;
+            --panel: #0b1220;
+            --muted: #94a3b8;
+            --accent: #7dd3fc;
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #e6eef6;
+        }
+        
+        body {
+            margin: 0;
+            background: linear-gradient(180deg, var(--bg), #071a2a);
+            color: var(--text);
+            font-family: Inter, system-ui;
+        }
+        
+        .wrap {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 24px;
+            background: var(--panel);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+        
+        .step {
+            background: #031022;
+            border: 1px solid var(--border);
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 14px;
+        }
+        
+        .step h3 {
+            color: var(--accent);
+            margin: 0 0 8px;
+        }
+        
+        textarea {
+            width: 90%;
+            padding: 10px;
+            margin-top: 6px;
+            background: #020617;
+            border: 1px solid var(--border);
+            color: #fff;
+            border-radius: 8px;
+            font-family: monospace;
+        }
+        
+        button {
+            margin-top: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #0b1220;
+            color: #fff;
+            cursor: pointer;
+        }
+        
+        button.primary {
+            background: #006a7a;
+            font-weight: bold;
+        }
+        /* MODAL (FIXED DESIGN) */
+        
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .modalBox {
+            width: 520px;
+            max-width: 90%;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+        }
+        
+        .modalBox h3 {
+            margin: 0 0 10px;
+            color: var(--accent);
+        }
+        
+        .modalActions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- NEWLINE MODAL ONLY -->
+    <div id="newlineModal" class="modal">
+        <div class="modalBox">
+            <h3>Newline → Comma</h3>
+
+            <textarea id="newlineInput" rows="6" placeholder="Paste text..." onchange="convertNewlines()"></textarea>
+
+            <textarea id="newlineOutput" rows="4" readonly></textarea>
+
+            <div class="modalActions">
+                <button class="primary" onclick="copyText('newlineOutput')">Copy</button>
+                <button onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="wrap">
+
+        <!-- EXTRACT TOOL (NOT MODAL) -->
+        <div class="step">
+            <h3>Extract Internal ID (10-digit)</h3>
+
+            <textarea id="extractInput" rows="6" placeholder="Paste logs..." onchange="extractIDs()"></textarea>
+
+            <textarea id="extractOutput" rows="4" readonly></textarea>
+            <br>
+            <button onclick="copyText('extractOutput')">Copy</button>
+        </div>
+
+        <!-- NEWLINE TOOL BUTTON -->
+        <div class="step">
+            <h3>Utilities</h3>
+            <button onclick="openModal()">Newline Tool</button>
+        </div>
+
+    </div>
+
+    <script>
+        function openModal() {
+            document.getElementById("newlineModal").style.display = "flex";
+        }
+
+        function closeModal() {
+            document.getElementById("newlineModal").style.display = "none";
+        }
+
+        /* COPY */
+        function copyText(id) {
+            let el = document.getElementById(id);
+            if (!el.value) return alert("Nothing to copy");
+            el.select();
+            document.execCommand("copy");
+            alert("Copied!");
+        }
+
+        /* EXTRACT 10 DIGIT ID */
+        function extractIDs() {
+            let text = document.getElementById("extractInput").value;
+            let lines = text.split(/\n/);
+            let set = new Set();
+
+            lines.forEach(line => {
+                line = line.trim();
+
+                // start of line
+                let start = line.match(/^(\d{10})/);
+                if (start) {
+                    set.add(start[1]);
+                    return;
+                }
+
+                // after "-"
+                let dash = line.match(/-\s*(\d{10})/);
+                if (dash) {
+                    set.add(dash[1]);
+                    return;
+                }
+
+                // fallback
+                let all = line.match(/\b\d{10}\b/g);
+                if (all) {
+                    all.forEach(x => set.add(x));
+                }
+            });
+
+            document.getElementById("extractOutput").value =
+                Array.from(set).join("\n");
+        }
+
+        /* NEWLINE → COMMA */
+        function convertNewlines() {
+            let input = document.getElementById("newlineInput").value;
+
+            let output = input
+                .split(/\r?\n+/)
+                .map(x => x.trim())
+                .filter(x => x)
+                .join(",");
+
+            document.getElementById("newlineOutput").value = output;
+        }
+    </script>
+
+</body>
+
+</html>
