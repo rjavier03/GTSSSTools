@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>B2BE Viewer Pro</title>
+
+    <style>
+         :root {
+            --bg: #071025;
+            --panel: #0b1220;
+            --muted: #94a3b8;
+            --accent: #7dd3fc;
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #e6eef6;
+            --output-bg: #020617;
+        }
+        
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            background: linear-gradient(180deg, var(--bg), #071a2a);
+            color: var(--text);
+            font-family: Inter, system-ui, Segoe UI, Roboto, Helvetica, Arial;
+        }
+        
+        .wrap {
+            max-width: 1100px;
+            margin: 20px auto;
+            padding: 20px;
+            background: var(--panel);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+        /* GRID */
+        
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .box {
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: #0a1324;
+        }
+        
+        h2 {
+            margin: 0 0 10px;
+            font-size: 14px;
+            color: var(--accent);
+        }
+        /* INPUT */
+        
+        textarea {
+            width: 100%;
+            min-height: 180px;
+            background: #031022;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+        }
+        /* FILTER GRID */
+        
+        .filter-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        
+        .filter-grid input,
+        .filter-grid select {
+            height: 38px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: #031022;
+            color: var(--text);
+            padding: 6px 10px;
+            font-size: 13px;
+            outline: none;
+        }
+        
+        .filter-grid input:focus,
+        .filter-grid select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.15);
+        }
+        
+        .small {
+            font-size: 11px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+        /* DELIMITER */
+        
+        .delimiter-group {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        
+        .delimiter-group input {
+            display: none;
+        }
+        
+        .delimiter-group span {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: #031022;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .delimiter-group input:checked+span {
+            background: #007b8f;
+            color: #fff;
+        }
+        /* OUTPUT */
+        
+        .output {
+            margin-top: 15px;
+            padding: 12px;
+            background: var(--output-bg);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            font-family: monospace;
+        }
+        
+        .line {
+            display: flex;
+            gap: 8px;
+            padding: 2px 0;
+        }
+        
+        .line span.num {
+            width: 40px;
+            color: #94a3b8;
+        }
+        
+        .highlight {
+            background: #7dd3fc;
+            color: #000;
+            font-weight: bold;
+        }
+        
+        .meta {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+        
+        .input-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        /* textarea upgrade */
+        
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            background: #031022;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            font-family: ui-monospace, monospace;
+            font-size: 13px;
+            outline: none;
+            transition: 0.2s;
+            resize: vertical;
+        }
+        
+        textarea:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.12);
+        }
+        /* file upload row */
+        
+        .file-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        /* custom upload button */
+        
+        .file-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: linear-gradient(180deg, #0b1220, #071022);
+            color: var(--text);
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.2s;
+            user-select: none;
+        }
+        
+        .file-btn:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.10);
+        }
+        
+        .file-btn input {
+            display: none;
+        }
+        /* hint text */
+        
+        .file-hint {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: monospace;
+            opacity: 0.8;
+        }
+        
+        .custom-delim {
+            margin-top: 10px;
+        }
+        
+        .custom-box {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        /* input styling (consistent with your theme) */
+        
+        #custom {
+            width: 50%;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: #031022;
+            color: var(--text);
+            font-family: ui-monospace, monospace;
+            font-size: 13px;
+            outline: none;
+            transition: 0.2s;
+        }
+        
+        #custom:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.12);
+        }
+        /* status indicator */
+        
+        .custom-status {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: monospace;
+            padding-left: 2px;
+            opacity: 0.9;
+        }
+        /* optional “valid delimiter” state */
+        
+        .custom-status.active {
+            color: #7dd3fc;
+        }
+        
+        select#occ {
+            height: 48px;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="wrap">
+
+        <!-- INPUT -->
+        <div class="box">
+            <h2>Input</h2>
+
+            <div class="input-wrap">
+
+                <textarea id="input" placeholder="Paste B2BE / CSV / pipe data here..."></textarea>
+
+                <!-- file upload styled -->
+                <div class="file-row">
+                    <label class="file-btn">
+                  📁 Upload File
+                  <input type="file" id="file">
+                </label>
+
+                    <div class="file-hint">
+                        .csv / .txt / .edi supported
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div class="grid">
+
+            <div class="box">
+                <h2>Settings</h2>
+
+                <div class="delimiter-group">
+                    <label><input type="radio" name="del" value="\t" checked><span>TAB</span></label>
+                    <label><input type="radio" name="del" value="|"><span>PIPE</span></label>
+                    <label><input type="radio" name="del" value=","><span>COMMA</span></label>
+                    <label><input type="radio" name="del" value="CUSTOM"><span>CUSTOM</span></label>
+                </div>
+
+                <br>
+                <div class="custom-delim">
+
+                    <div class="small">Custom Delimiter</div>
+
+                    <div class="custom-box">
+
+                        <input type="text" id="custom" placeholder="e.g. |  OR  ,  OR  \\t  OR  ;">
+
+                        <div class="custom-status" id="delimStatus">
+                            Active: auto-detect off
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- FILTER -->
+            <div class="box">
+                <h2>Filter</h2>
+
+                <div class="filter-grid">
+
+                    <div>
+                        <div class="small">Segment</div>
+                        <input list="segList" id="segment" placeholder="Auto segment">
+                        <datalist id="segList"></datalist>
+                    </div>
+
+                    <div>
+                        <div class="small">Occurrence</div>
+                        <select id="occ"></select>
+                    </div>
+
+                    <div>
+                        <div class="small">Go To Line</div>
+                        <input type="number" id="goto" placeholder="Line">
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- OUTPUT -->
+        <div class="output meta" id="meta"></div>
+        <div class="output" id="out">No record selected</div>
+
+    </div>
+
+    <script>
+        let records = [];
+        let currentIndex = 0;
+
+        document.getElementById("input").addEventListener("input", parse);
+        document.getElementById("file").addEventListener("change", loadFile);
+
+        document.querySelectorAll("input[name=del]")
+            .forEach(r => r.addEventListener("change", parse));
+
+        document.getElementById("custom").addEventListener("input", parse);
+
+        document.getElementById("segment").addEventListener("input", onSegment);
+        document.getElementById("occ").addEventListener("change", onOcc);
+        document.getElementById("goto").addEventListener("input", goLine);
+
+        function getDel() {
+            let v = [...document.querySelectorAll("input[name=del]")]
+                .find(x => x.checked).value;
+
+            if (v === "CUSTOM")
+                return document.getElementById("custom").value;
+
+            if (v === "\\t") return "\t";
+
+            return v;
+        }
+
+        function loadFile(e) {
+            let f = e.target.files[0];
+            let r = new FileReader();
+            r.onload = ev => {
+                document.getElementById("input").value = ev.target.result;
+                parse();
+            };
+            r.readAsText(f);
+        }
+
+        function parse() {
+
+            let text = document.getElementById("input").value;
+            let del = getDel();
+
+            if (text && !del) {
+                alert("Invalid delimiter");
+                return;
+            }
+
+            let lines = text.split(/\r?\n/);
+            records = [];
+
+            for (let l of lines) {
+                l = l.trim();
+                if (!l || l.startsWith("<")) continue;
+
+                let f = l.split(del);
+
+                records.push({
+                    seg: (f[0] || "").trim(),
+                    fields: f
+                });
+            }
+
+            buildSegments();
+
+            if (records.length) {
+                auto();
+            }
+        }
+
+        function buildSegments() {
+            let dl = document.getElementById("segList");
+            dl.innerHTML = "";
+
+            [...new Set(records.map(r => r.seg))]
+            .forEach(s => {
+                let o = document.createElement("option");
+                o.value = s;
+                dl.appendChild(o);
+            });
+        }
+
+        function auto() {
+            let first = records[0].seg;
+            document.getElementById("segment").value = first;
+            buildOcc(first);
+        }
+
+        function onSegment() {
+            buildOcc(this.value.trim());
+        }
+
+        function buildOcc(seg) {
+
+            let occ = document.getElementById("occ");
+            occ.innerHTML = "";
+
+            let matches = records
+                .map((r, i) => ({
+                    r,
+                    i
+                }))
+                .filter(x => x.r.seg === seg);
+
+            matches.forEach((m, i) => {
+                let o = document.createElement("option");
+                o.value = m.i;
+                o.textContent = "Occurrence " + (i + 1);
+                occ.appendChild(o);
+            });
+
+            if (matches.length) {
+                currentIndex = matches[0].i;
+                render(currentIndex);
+            }
+        }
+
+        function onOcc() {
+            currentIndex = parseInt(this.value);
+            render(currentIndex);
+        }
+
+        function render(i) {
+
+            let r = records[i];
+            if (!r) return;
+
+            document.getElementById("meta").innerHTML =
+                `Segment: ${r.seg} | Record ${i+1} of ${records.length}`;
+
+            let html = "";
+
+            r.fields.forEach((f, idx) => {
+                html += `
+      <div class="line" id="ln-${idx+1}">
+        <span class="num">${idx+1} |</span>
+        <span>${escape(f)}</span>
+      </div>`;
+            });
+
+            document.getElementById("out").innerHTML = html;
+        }
+
+        function goLine() {
+
+            let ln = parseInt(document.getElementById("goto").value);
+            if (!ln) return;
+
+            let el = document.getElementById("ln-" + ln);
+            if (!el) return;
+
+            document.querySelectorAll(".line")
+                .forEach(x => x.classList.remove("highlight"));
+
+            el.classList.add("highlight");
+            el.scrollIntoView({
+                behavior: "smooth",
+                block: "center"
+            });
+        }
+
+        function escape(s) {
+            return (s || "")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+        }
+    </script>
+
+</body>
+
+</html>
