@@ -9,7 +9,7 @@ let appState = {
     department: "GTSSS",
     reportingManager: "",
     company: "B2BE GSS",
-    shiftSchedule: "US1",
+    shiftSchedule: "AU",
     multipleShifts: [], 
     cutoffMonth: new Date().toISOString().slice(0, 7),
     leaves: {},              
