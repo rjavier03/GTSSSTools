@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Timesheet & Allowance Tracker</title>
+
+    <!-- Google Fonts & Flatpickr -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"
+    />
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+
+    <style>
+      :root {
+        --bg-color: #f8fafc;
+        --card-bg: #ffffff;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+        --border-color: #e2e8f0;
+        --primary: #2563eb;
+        --primary-hover: #1d4ed8;
+        --success: #10b981;
+        --success-hover: #059669;
+        --danger: #ef4444;
+        --danger-hover: #dc2626;
+        --table-header-bg: #f1f5f9;
+        --weekend-bg: #eff6ff;
+        --sticky-bg: #ffffff;
+        --modal-bg: rgba(15, 23, 42, 0.6);
+        --card-shadow:
+          0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        --radius: 10px;
+      }
+
+      [data-theme="dark"] {
+        --bg-color: #0f172a;
+        --card-bg: #1e293b;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --border-color: #334155;
+        --primary: #3b82f6;
+        --primary-hover: #2563eb;
+        --table-header-bg: #334155;
+        --weekend-bg: #1e3a8a;
+        --sticky-bg: #1e293b;
+        --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        margin: 0;
+        padding: 24px;
+        line-height: 1.5;
+      }
+
+      .container {
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+
+      .header-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .header-bar h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+        color: var(--text-main);
+      }
+
+      .header-actions {
+        display: flex;
+        gap: 12px;
+      }
+
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: var(--card-shadow);
+      }
+
+      h2 {
+        margin-top: 0;
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: var(--text-main);
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 12px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .grid-4 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 20px;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      label {
+        font-weight: 500;
+        font-size: 0.825rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+      }
+
+      input[type="text"],
+      input[type="month"],
+      select {
+        padding: 10px 14px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background-color: var(--card-bg);
+        color: var(--text-main);
+        font-size: 0.9rem;
+        font-family: inherit;
+        outline: none;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+
+      input[type="text"]:focus,
+      input[type="month"]:focus,
+      select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      }
+
+      input[readonly] {
+        cursor: pointer;
+        background-color: var(--table-header-bg);
+      }
+
+      button {
+        padding: 10px 18px;
+        background-color: var(--primary);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.875rem;
+        font-family: inherit;
+        transition:
+          background-color 0.2s,
+          transform 0.1s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      button:hover {
+        background-color: var(--primary-hover);
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+
+      .btn-success {
+        background-color: var(--success);
+      }
+      .btn-success:hover {
+        background-color: var(--success-hover);
+      }
+
+      .btn-delete {
+        background-color: transparent;
+        color: var(--danger);
+        border: 1px solid var(--danger);
+        padding: 3px 8px;
+        font-size: 0.75rem;
+        border-radius: 4px;
+      }
+
+      .btn-delete:hover {
+        background-color: var(--danger);
+        color: white;
+      }
+
+      ul.item-list {
+        list-style: none;
+        padding: 0;
+        margin: 16px 0 0 0;
+        max-height: 180px;
+        overflow-y: auto;
+      }
+
+      ul.item-list li {
+        padding: 8px 12px;
+        background: var(--table-header-bg);
+        border-radius: 6px;
+        margin-bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.85rem;
+      }
+
+      /* Table & Modern Scrollbar */
+      .table-responsive {
+        overflow-x: auto;
+        max-height: 550px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.85rem;
+        text-align: center;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--border-color);
+        border-right: 1px solid var(--border-color);
+        padding: 10px 12px;
+        white-space: nowrap;
+      }
+
+      th {
+        background-color: var(--table-header-bg);
+        color: var(--text-main);
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
+
+      tr.weekend-row {
+        background-color: var(--weekend-bg);
+      }
+
+      .sticky-col {
+        position: sticky;
+        background-color: var(--sticky-bg);
+        z-index: 1;
+      }
+
+      th.sticky-col {
+        z-index: 3;
+        background-color: var(--table-header-bg);
+      }
+
+      .col-1 {
+        left: 0;
+      }
+      .col-2 {
+        left: 95px;
+      }
+      .col-3 {
+        left: 190px;
+      }
+      .col-4 {
+        left: 275px;
+      }
+
+      /* Switch */
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 38px;
+        height: 22px;
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #cbd5e1;
+        transition: 0.3s;
+        border-radius: 22px;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.3s;
+        border-radius: 50%;
+      }
+
+      input:checked + .slider {
+        background-color: var(--success);
+      }
+      input:checked + .slider:before {
+        transform: translateX(16px);
+      }
+
+      .holiday-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        background: var(--table-header-bg);
+        border-radius: 6px;
+        margin-bottom: 8px;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        font-size: 0.725rem;
+        font-weight: 600;
+        border-radius: 12px;
+        margin-top: 2px;
+      }
+
+      .badge-regular {
+        background: #dbeafe;
+        color: #1e40af;
+      }
+      .badge-special {
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      /* Modal */
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: var(--modal-bg);
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+      }
+
+      .modal-content {
+        background-color: var(--card-bg);
+        padding: 24px;
+        border-radius: var(--radius);
+        max-width: 400px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header-bar">
+        <h1>Timesheet & Allowance Tracker</h1>
+        <div class="header-actions">
+          <button id="themeToggleBtn" onclick="toggleTheme()">☀️ Light</button>
+          <button class="btn-success" onclick="exportToExcel()">
+            📥 Export Excel
+          </button>
+        </div>
+      </div>
+
+      <!-- Employee Profile -->
+      <div class="card">
+        <h2>👤 1. Employee Profile & Cutoff Settings</h2>
+        <div class="grid-4">
+          <div class="form-group">
+            <label>Staff ID</label>
+            <input type="text" id="staffId" />
+          </div>
+          <div class="form-group">
+            <label>Staff Name</label>
+            <input type="text" id="staffName" />
+          </div>
+          <div class="form-group">
+            <label>Department</label>
+            <input type="text" id="department" />
+          </div>
+          <div class="form-group">
+            <label>Reporting Manager</label>
+            <input type="text" id="reportingManager" />
+          </div>
+          <div class="form-group">
+            <label>Company</label>
+            <input type="text" id="company" />
+          </div>
+          <div class="form-group">
+            <label>Shift Schedule</label>
+            <select id="shiftSchedule"></select>
+          </div>
+          <div class="form-group">
+            <label>Cutoff Month</label>
+            <input type="month" id="cutoffMonth" />
+          </div>
+          <div class="form-group">
+            <label>Active Cutoff Period</label>
+            <input type="text" id="periodDisplay" readonly />
+          </div>
+        </div>
+      </div>
+
+      <!-- Allowances & Leaves -->
+      <div class="grid-2">
+        <!-- Multi-Date Leaves -->
+        <div class="card">
+          <h2>🌴 2. Manage Leaves</h2>
+          <div class="form-group" style="margin-bottom: 12px">
+            <label>Select Date(s)</label>
+            <input
+              type="text"
+              id="leaveDate"
+              placeholder="Click to choose dates..."
+              readonly
+            />
+          </div>
+          <div class="form-group" style="margin-bottom: 12px">
+            <label>Leave ID / Type</label>
+            <input type="text" id="leaveId" placeholder="e.g. VL-1002" />
+          </div>
+          <button onclick="addLeave()">Add Leave Entry</button>
+          <ul id="leaveList" class="item-list"></ul>
+        </div>
+
+        <!-- Multi-Date Transportation -->
+        <div class="card">
+          <h2>🚗 3. Transportation Allowance</h2>
+          <div class="form-group" style="margin-bottom: 12px">
+            <label>Select Date(s)</label>
+            <input
+              type="text"
+              id="transpoDate"
+              placeholder="Click to choose dates..."
+              readonly
+            />
+          </div>
+          <button onclick="addTranspoDate()">Add Transportation (₱100)</button>
+          <ul id="transpoList" class="item-list"></ul>
+        </div>
+
+        <!-- Multi-Date Weekend On-Call -->
+        <div class="card">
+          <h2>📞 4. Weekend On-Call Duty</h2>
+          <div class="form-group" style="margin-bottom: 12px">
+            <label>Select Date(s)</label>
+            <input
+              type="text"
+              id="weekendOnCallDate"
+              placeholder="Click to choose dates..."
+              readonly
+            />
+          </div>
+          <button onclick="toggleWeekendOnCall()">
+            Toggle Weekend On-Call
+          </button>
+          <ul id="weekendOnCallList" class="item-list"></ul>
+        </div>
+
+        <!-- Cutoff Holidays -->
+        <div class="card">
+          <h2>🇵🇭 5. Public Holidays (Cutoff)</h2>
+          <div id="cutoffHolidayList"></div>
+        </div>
+      </div>
+
+      <!-- Main Table -->
+      <div class="card">
+        <h2>📊 6. Calculated Timesheet Preview</h2>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th class="sticky-col col-1">Date</th>
+                <th class="sticky-col col-2">Days</th>
+                <th class="sticky-col col-3">Time (From)</th>
+                <th class="sticky-col col-4">Time (To)</th>
+                <th>Night Diff</th>
+                <th>Rest Day OT</th>
+                <th>Regular Day OT</th>
+                <th>Special Hol</th>
+                <th>Reg Hol</th>
+                <th>Transportation</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody id="timesheetBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="validationModal" class="modal">
+      <div class="modal-content">
+        <p id="modalMessage" style="margin-bottom: 20px; font-weight: 500"></p>
+        <button onclick="closeModal()">OK</button>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
