@@ -1,5 +1,6 @@
-let SHIFTS = {};
+// Updated JavaScript to completely remove/hide rows where both Time (From) and Time (To) are 00:00[cite: 5]
 
+let SHIFTS = {};
 let apiHolidays = {};
 
 let appState = {
@@ -9,6 +10,7 @@ let appState = {
     reportingManager: "",
     company: "B2BE GSS",
     shiftSchedule: "US1",
+    multipleShifts: [], // Array of { fromDate, toDate, shiftKey }
     cutoffMonth: new Date().toISOString().slice(0, 7),
     leaves: {},              
     workedHolidays: {},      
@@ -60,6 +62,10 @@ async function loadShiftsJson() {
         console.warn("Could not load shifts.json:", err);
     }
 
+    updateShiftDropdownUI();
+}
+
+function updateShiftDropdownUI() {
     const select = document.getElementById("shiftSchedule");
     if (select) {
         select.innerHTML = "";
@@ -70,16 +76,18 @@ async function loadShiftsJson() {
             if (key === appState.shiftSchedule) opt.selected = true;
             select.appendChild(opt);
         });
+
+        // Add Multiple Shift option
+        const multiOpt = document.createElement("option");
+        multiOpt.value = "MULTIPLE";
+        multiOpt.textContent = "Multiple Shift...";
+        if (appState.shiftSchedule === "MULTIPLE") multiOpt.selected = true;
+        select.appendChild(multiOpt);
     }
 }
 
-/**
- * Official Gazette English standard naming mapping
- * Reference: https://www.officialgazette.gov.ph/nationwide-holidays/
- */
 function simplifyHolidayName(rawName, dateStr) {
     const name = rawName.toLowerCase();
-
     if (dateStr.endsWith("-01-01") || name.includes("new year")) return "New Year's Day";
     if (dateStr.endsWith("-04-09") || name.includes("kagitingan") || name.includes("valor")) return "Day of Valor";
     if (dateStr.endsWith("-05-01") || name.includes("labor")) return "Labor Day";
@@ -99,7 +107,6 @@ function simplifyHolidayName(rawName, dateStr) {
     if (name.includes("edsa")) return "EDSA People Power Revolution Anniversary";
     if (name.includes("fitr")) return "Eid'l Fitr";
     if (name.includes("adha")) return "Eid'l Adha";
-
     return rawName;
 }
 
@@ -122,7 +129,6 @@ function classifyPHHoliday(item, dateStr) {
     ];
 
     let isRegular = false;
-
     if (dateStr.endsWith("-08-21") || gazetteSpecialKeywords.some(kw => nameLower.includes(kw))) {
         isRegular = false;
     } else if (gazetteRegularKeywords.some(kw => nameLower.includes(kw))) {
@@ -168,6 +174,8 @@ function loadLocalStorage() {
     setVal("company", appState.company);
     setVal("cutoffMonth", appState.cutoffMonth);
     
+    updateShiftDropdownUI();
+
     const theme = localStorage.getItem("timesheetTheme") || "light";
     document.documentElement.setAttribute("data-theme", theme);
     const themeBtn = document.getElementById("themeToggleBtn");
@@ -179,7 +187,7 @@ function saveLocalStorage() {
 }
 
 function setupEventListeners() {
-    const inputs = ["staffId", "staffName", "department", "reportingManager", "company", "shiftSchedule", "cutoffMonth"];
+    const inputs = ["staffId", "staffName", "department", "reportingManager", "company", "cutoffMonth"];
     inputs.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -191,6 +199,179 @@ function setupEventListeners() {
             });
         }
     });
+
+    const shiftSelect = document.getElementById("shiftSchedule");
+    if (shiftSelect) {
+        shiftSelect.addEventListener("change", async (e) => {
+            const val = e.target.value;
+            if (val === "MULTIPLE") {
+                openMultipleShiftModal();
+            } else {
+                appState.shiftSchedule = val;
+                saveLocalStorage();
+                renderAll();
+            }
+        });
+    }
+}
+
+function openMultipleShiftModal() {
+    const modal = document.getElementById("multipleShiftModal");
+    if (modal) {
+        modal.style.display = "flex";
+        populateMultipleShiftModalEntries();
+    }
+}
+
+function closeMultipleShiftModal() {
+    const modal = document.getElementById("multipleShiftModal");
+    if (modal) {
+        modal.style.display = "none";
+        if (appState.shiftSchedule === "MULTIPLE" && (!appState.multipleShifts || appState.multipleShifts.length === 0)) {
+            appState.shiftSchedule = Object.keys(SHIFTS)[0] || "US1";
+            updateShiftDropdownUI();
+            saveLocalStorage();
+            renderAll();
+        }
+    }
+}
+
+function populateMultipleShiftModalEntries() {
+    const container = document.getElementById("multipleShiftEntriesContainer");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const { startDate, endDate } = getCutoffRange(appState.cutoffMonth);
+    const minDate = formatYMD(startDate);
+    const maxDate = formatYMD(endDate);
+
+    const list = appState.multipleShifts && appState.multipleShifts.length > 0 
+        ? appState.multipleShifts 
+        : [{ fromDate: "", toDate: "", shiftKey: Object.keys(SHIFTS)[0] || "" }];
+
+    list.forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "multiple-shift-row";
+        
+        let optionsHtml = "";
+        Object.keys(SHIFTS).forEach(k => {
+            optionsHtml += `<option value="${k}" ${item.shiftKey === k ? "selected" : ""}>${SHIFTS[k].label}</option>`;
+        });
+
+        row.innerHTML = `
+            <div>
+                <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">From Date</label>
+                <input type="date" class="ms-from" value="${item.fromDate || ""}" min="${minDate}" max="${maxDate}" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
+            </div>
+            <div>
+                <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">To Date</label>
+                <input type="date" class="ms-to" value="${item.toDate || ""}" min="${minDate}" max="${maxDate}" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
+            </div>
+            <div>
+                <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">Shift Schedule</label>
+                <select class="ms-shift" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
+                    ${optionsHtml}
+                </select>
+            </div>
+            <div style="padding-top:16px;">
+                <button type="button" class="btn-delete" onclick="removeMultipleShiftRow(this)">Remove</button>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+}
+
+function addMultipleShiftRow() {
+    const container = document.getElementById("multipleShiftEntriesContainer");
+    if (!container) return;
+    
+    const { startDate, endDate } = getCutoffRange(appState.cutoffMonth);
+    const minDate = formatYMD(startDate);
+    const maxDate = formatYMD(endDate);
+    
+    const row = document.createElement("div");
+    row.className = "multiple-shift-row";
+    let optionsHtml = "";
+    Object.keys(SHIFTS).forEach(k => {
+        optionsHtml += `<option value="${k}">${SHIFTS[k].label}</option>`;
+    });
+
+    row.innerHTML = `
+        <div>
+            <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">From Date</label>
+            <input type="date" class="ms-from" min="${minDate}" max="${maxDate}" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
+        </div>
+        <div>
+            <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">To Date</label>
+            <input type="date" class="ms-to" min="${minDate}" max="${maxDate}" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
+        </div>
+        <div>
+            <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">Shift Schedule</label>
+            <select class="ms-shift" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
+                ${optionsHtml}
+            </select>
+        </div>
+        <div style="padding-top:16px;">
+            <button type="button" class="btn-delete" onclick="removeMultipleShiftRow(this)">Remove</button>
+        </div>
+    `;
+    container.appendChild(row);
+}
+
+function removeMultipleShiftRow(btn) {
+    const row = btn.closest(".multiple-shift-row");
+    if (row) row.remove();
+}
+
+function saveMultipleShiftsConfig() {
+    const container = document.getElementById("multipleShiftEntriesContainer");
+    if (!container) return;
+    const rows = container.querySelectorAll(".multiple-shift-row");
+    let newShifts = [];
+    const { startDate, endDate } = getCutoffRange(appState.cutoffMonth);
+    const minStr = formatYMD(startDate);
+    const maxStr = formatYMD(endDate);
+
+    let validationErrors = [];
+
+    rows.forEach((r, idx) => {
+        const fromDate = r.querySelector(".ms-from").value;
+        const toDate = r.querySelector(".ms-to").value;
+        const shiftKey = r.querySelector(".ms-shift").value;
+
+        if (fromDate && toDate) {
+            if (fromDate < minStr || fromDate > maxStr || toDate < minStr || toDate > maxStr) {
+                validationErrors.push(`Row ${idx + 1}: Dates must be within the current cutoff period (${minStr} to ${maxStr}).`);
+            } else if (fromDate > toDate) {
+                validationErrors.push(`Row ${idx + 1}: 'From Date' cannot be later than 'To Date'.`);
+            } else {
+                newShifts.push({ fromDate, toDate, shiftKey });
+            }
+        }
+    });
+
+    if (validationErrors.length > 0) {
+        showModal("<strong>Validation Error:</strong><br><br>" + validationErrors.join("<br>"));
+        return;
+    }
+
+    appState.shiftSchedule = "MULTIPLE";
+    appState.multipleShifts = newShifts;
+    saveLocalStorage();
+    updateShiftDropdownUI();
+    closeMultipleShiftModal();
+    renderAll();
+}
+
+function getShiftForDate(dateStr) {
+    if (appState.shiftSchedule === "MULTIPLE" && appState.multipleShifts) {
+        for (let ms of appState.multipleShifts) {
+            if (dateStr >= ms.fromDate && dateStr <= ms.toDate) {
+                return SHIFTS[ms.shiftKey] || null;
+            }
+        }
+    }
+    return SHIFTS[appState.shiftSchedule] || null;
 }
 
 function renderAll() {
@@ -228,19 +409,10 @@ function parseDatesInput(inputStr) {
 function addLeave() {
     const leaveInput = document.getElementById("leaveDate");
     const leaveId = document.getElementById("leaveId").value.trim();
-
-    if (!leaveInput.value) {
-        showModal("Please select date(s) for the leave.");
-        return;
-    }
-    if (!leaveId) {
-        showModal("Please enter a Leave ID.");
-        return;
-    }
-
+    if (!leaveInput.value) { showModal("Please select date(s) for the leave."); return; }
+    if (!leaveId) { showModal("Please enter a Leave ID."); return; }
     const dates = parseDatesInput(leaveInput.value);
     dates.forEach(d => { appState.leaves[d] = leaveId; });
-
     document.getElementById("leaveId").value = "";
     if (leaveInput._flatpickr) leaveInput._flatpickr.clear();
     saveLocalStorage();
@@ -255,14 +427,9 @@ function deleteLeave(dateStr) {
 
 function addTranspoDate() {
     const transpoInput = document.getElementById("transpoDate");
-    if (!transpoInput || !transpoInput.value) {
-        showModal("Please select date(s) for Transportation.");
-        return;
-    }
-
+    if (!transpoInput || !transpoInput.value) { showModal("Please select date(s) for Transportation."); return; }
     const dates = parseDatesInput(transpoInput.value);
     dates.forEach(d => { appState.transpoDates[d] = 100; });
-
     if (transpoInput._flatpickr) transpoInput._flatpickr.clear();
     saveLocalStorage();
     renderAll();
@@ -276,11 +443,7 @@ function deleteTranspoDate(dateStr) {
 
 function toggleWeekendOnCall() {
     const weekendInput = document.getElementById("weekendOnCallDate");
-    if (!weekendInput || !weekendInput.value) {
-        showModal("Please select date(s) for Weekend On-Call.");
-        return;
-    }
-
+    if (!weekendInput || !weekendInput.value) { showModal("Please select date(s) for Weekend On-Call."); return; }
     const { startDate, endDate } = getCutoffRange(appState.cutoffMonth);
     const dates = parseDatesInput(weekendInput.value);
     let invalidMessages = [];
@@ -293,9 +456,9 @@ function toggleWeekendOnCall() {
         const isInCutoff = (dateObj >= startDate && dateObj <= endDate);
 
         if (!isInCutoff) {
-            invalidMessages.push(`<strong>${dateInput}</strong> is outside the current cutoff range (${formatDisplayDate(startDate)} - ${formatDisplayDate(endDate)}).`);
+            invalidMessages.push(`<strong>${dateInput}</strong> is outside the current cutoff range.`);
         } else if (!isWeekend) {
-            invalidMessages.push(`<strong>${dateInput}</strong> is not a weekend (Saturday or Sunday).`);
+            invalidMessages.push(`<strong>${dateInput}</strong> is not a weekend.`);
         } else {
             if (appState.weekendOnCallDates[dateInput]) {
                 delete appState.weekendOnCallDates[dateInput];
@@ -306,10 +469,9 @@ function toggleWeekendOnCall() {
     });
 
     if (invalidMessages.length > 0) {
-        showModal("<strong>Invalid Date Selection for Weekend On-Call:</strong><br><br>" + invalidMessages.join("<br>"));
+        showModal("<strong>Invalid Date Selection:</strong><br><br>" + invalidMessages.join("<br>"));
         return;
     }
-
     if (weekendInput._flatpickr) weekendInput._flatpickr.clear();
     saveLocalStorage();
     renderAll();
@@ -359,7 +521,11 @@ function renderHolidaysAndLeavesLists() {
             const parts = date.split("-");
             const d = new Date(parts[0], parts[1] - 1, parts[2]);
             if (d >= startDate && d <= endDate) {
-                weekendList.innerHTML += `<li><span><strong>${date}</strong> (Weekend Duty)</span> <button class="btn-delete" onclick="deleteWeekendOnCall('${date}')">Remove</button></li>`;
+                weekendList.innerHTML += `
+                    <li>
+                        <span><strong>${date}</strong> (Weekend Duty)</span> 
+                        <button class="btn-delete" onclick="deleteWeekendOnCall('${date}')">Remove</button>
+                    </li>`;
             }
         });
     }
@@ -428,7 +594,6 @@ function calculateNightDiffHours(timeFrom, timeTo) {
 
     const startDecimal = h1 + (m1 / 60);
     const endDecimal = h2 + (m2 / 60);
-
     let ndHours = 0;
     
     if (startDecimal < 24 && endDecimal > 22) {
@@ -436,13 +601,11 @@ function calculateNightDiffHours(timeFrom, timeTo) {
         const segEnd = Math.min(endDecimal, 24);
         if (segEnd > segStart) ndHours += (segEnd - segStart);
     }
-
     if (startDecimal < 6 && endDecimal > 0) {
         const segStart = Math.max(startDecimal, 0);
         const segEnd = Math.min(endDecimal, 6);
         if (segEnd > segStart) ndHours += (segEnd - segStart);
     }
-
     return Math.min(7, ndHours);
 }
 
@@ -453,9 +616,7 @@ function calculateRowsForDate(dateObj) {
     const dayOfWeek = current.getDay();
     const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
     const holidayInfo = apiHolidays[dateStr];
-
-    const sched = appState.shiftSchedule;
-    const currentShift = SHIFTS[sched];
+    const currentShift = getShiftForDate(dateStr);
 
     const buildRow = (timeFrom, timeTo, forceHolidayInfo = null, isMorningCarryOver = false, overrideDateObj = null, overrideDateStr = null, overrideDayName = null, overrideIsWeekend = null) => {
         const targetHoliday = forceHolidayInfo;
@@ -496,7 +657,7 @@ function calculateRowsForDate(dateObj) {
 
         if (targetIsWeekend && appState.weekendOnCallDates[targetDateStr]) {
             row.restDayOt = 8;
-            row.timeFrom = "0:00";
+            row.timeFrom = "00:00";
             row.timeTo = "23:59";
             row.nightDiff = 0;
         }
@@ -564,7 +725,7 @@ function calculateRowsForDate(dateObj) {
         }
     } 
     else {
-        const shift = SHIFTS[sched] || { from: "06:30", to: "15:30" };
+        const shift = currentShift || { from: "06:30", to: "15:30" };
         const timeFrom = isWeekend ? "" : shift.from;
         const timeTo = isWeekend ? "" : shift.to;
         return [buildRow(timeFrom, timeTo, holidayInfo, false)];
@@ -584,16 +745,13 @@ function renderTimesheetTable() {
 
     let totals = { nightDiff: 0, restDayOt: 0, regDayOt: 0, specialHol: 0, regHol: 0, transpo: 0 };
     let curr = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-
     let pendingMorningCarryOver = null;
 
     while (curr <= endDate) {
         const dateStr = formatYMD(curr);
         const dayOfWeek = curr.getDay();
         const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-
-        const sched = appState.shiftSchedule;
-        const currentShift = SHIFTS[sched];
+        const currentShift = getShiftForDate(dateStr);
         const isCrossMidnight = currentShift && currentShift.from && currentShift.to && (() => {
             const [hFrom] = currentShift.from.split(":").map(Number);
             const [hTo] = currentShift.to.split(":").map(Number);
@@ -604,6 +762,7 @@ function renderTimesheetTable() {
 
         if (pendingMorningCarryOver) {
             const prevDateStr = pendingMorningCarryOver.originDateStr;
+            const prevShift = getShiftForDate(prevDateStr);
             const carryHoliday = apiHolidays[dateStr] ? { ...apiHolidays[dateStr], dateStr } : null;
             
             const morningDateObj = new Date(curr.getFullYear(), curr.getMonth(), curr.getDate());
@@ -618,8 +777,8 @@ function renderTimesheetTable() {
                 dayName: morningDayName,
                 isWeekend: morningIsWeekend,
                 timeFrom: "00:00",
-                timeTo: currentShift.to,
-                nightDiff: (!carryHoliday || !appState.leaves[dateStr]) ? calculateNightDiffHours("00:00", currentShift.to) : 0,
+                timeTo: prevShift ? prevShift.to : "06:00",
+                nightDiff: (!carryHoliday || !appState.leaves[dateStr]) ? calculateNightDiffHours("00:00", prevShift ? prevShift.to : "06:00") : 0,
                 restDayOt: 0,
                 regDayOt: 0,
                 specialHol: 0,
@@ -633,9 +792,9 @@ function renderTimesheetTable() {
                 const isWorked = appState.workedHolidays[prevDateStr] !== false;
                 morningRow.remarks = carryHoliday.name;
                 if (isWorked) {
-                    const rawDuration = calculateDurationHours("00:00", currentShift.to);
+                    const rawDuration = calculateDurationHours("00:00", prevShift ? prevShift.to : "06:00");
                     const effectiveDuration = rawDuration >= 8 ? rawDuration - 1 : rawDuration;
-                    const [fromH] = currentShift.from.split(":").map(Number);
+                    const [fromH] = prevShift ? prevShift.from.split(":").map(Number) : [22];
                     const eveningHours = fromH >= 21 ? (24 - fromH) : 0;
                     let hours = Math.min(effectiveDuration, Math.max(0, 8 - eveningHours));
 
@@ -666,12 +825,17 @@ function renderTimesheetTable() {
         dayRows = dayRows.concat(normalRows);
 
         if (isCrossMidnight && !isWeekend && currentShift) {
-            pendingMorningCarryOver = {
-                originDateStr: dateStr
-            };
+            pendingMorningCarryOver = { originDateStr: dateStr };
+        } else {
+            pendingMorningCarryOver = null;
         }
 
         dayRows.forEach((data) => {
+            // Completely skip/remove row if both timeFrom and timeTo are 00:00
+            if (data.timeFrom === "00:00" && data.timeTo === "00:00") {
+                return;
+            }
+
             totals.nightDiff += parseFloat(data.nightDiff) || 0;
             totals.restDayOt += parseFloat(data.restDayOt) || 0;
             totals.regDayOt += parseFloat(data.regDayOt) || 0;
@@ -741,25 +905,9 @@ async function exportToExcel() {
         right: { style: 'thin', color: { argb: 'FF000000' } }
     };
 
-    const weekendFill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF6699FF' }
-    };
-
-    const greenAccent6Lighter60Fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE2EFDA' }
-    };
-
-    const headerFills = {
-        6: greenAccent6Lighter60Fill,
-        7: greenAccent6Lighter60Fill,
-        8: greenAccent6Lighter60Fill,
-        9: greenAccent6Lighter60Fill,
-        10: greenAccent6Lighter60Fill
-    };
+    const weekendFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF6699FF' } };
+    const greenAccent6Lighter60Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } };
+    const headerFills = { 6: greenAccent6Lighter60Fill, 7: greenAccent6Lighter60Fill, 8: greenAccent6Lighter60Fill, 9: greenAccent6Lighter60Fill, 10: greenAccent6Lighter60Fill };
 
     const { startDate, endDate } = getCutoffRange(appState.cutoffMonth);
     const cutoffOnCallCount = countCutoffOnCallDays(startDate, endDate);
@@ -791,15 +939,8 @@ async function exportToExcel() {
     tableHeaderRow.height = 28.8;
 
     tableHeaderRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        cell.font = { 
-            bold: true, 
-            size: 10, 
-            color: { argb: 'FF000000' }, 
-            name: 'Calibri' 
-        };
-        if (headerFills[colNumber]) {
-            cell.fill = headerFills[colNumber];
-        }
+        cell.font = { bold: true, size: 10, color: { argb: 'FF000000' }, name: 'Calibri' };
+        if (headerFills[colNumber]) cell.fill = headerFills[colNumber];
         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         cell.border = solidBorder;
     });
@@ -807,15 +948,13 @@ async function exportToExcel() {
     let curr = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
     let currentRowIndex = 10;
     let pendingMorningCarryOver = null;
-
     let totals = { nightDiff: 0, restDayOt: 0, regDayOt: 0, specialHol: 0, regHol: 0, transpo: 0 };
 
     while (curr <= endDate) {
         const dateStr = formatYMD(curr);
         const dayOfWeek = curr.getDay();
         const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-        const sched = appState.shiftSchedule;
-        const currentShift = SHIFTS[sched];
+        const currentShift = getShiftForDate(dateStr);
         const isCrossMidnight = currentShift && currentShift.from && currentShift.to && (() => {
             const [hFrom] = currentShift.from.split(":").map(Number);
             const [hTo] = currentShift.to.split(":").map(Number);
@@ -826,6 +965,7 @@ async function exportToExcel() {
 
         if (pendingMorningCarryOver) {
             const prevDateStr = pendingMorningCarryOver.originDateStr;
+            const prevShift = getShiftForDate(prevDateStr);
             const carryHoliday = apiHolidays[dateStr] ? { ...apiHolidays[dateStr], dateStr } : null;
             
             const morningDateObj = new Date(curr.getFullYear(), curr.getMonth(), curr.getDate());
@@ -840,8 +980,8 @@ async function exportToExcel() {
                 dayName: morningDayName,
                 isWeekend: morningIsWeekend,
                 timeFrom: "00:00",
-                timeTo: currentShift.to,
-                nightDiff: (!carryHoliday || !appState.leaves[dateStr]) ? calculateNightDiffHours("00:00", currentShift.to) : 0,
+                timeTo: prevShift ? prevShift.to : "06:00",
+                nightDiff: (!carryHoliday || !appState.leaves[dateStr]) ? calculateNightDiffHours("00:00", prevShift ? prevShift.to : "06:00") : 0,
                 restDayOt: 0,
                 regDayOt: 0,
                 specialHol: 0,
@@ -855,9 +995,9 @@ async function exportToExcel() {
                 const isWorked = appState.workedHolidays[prevDateStr] !== false;
                 morningRow.remarks = carryHoliday.name;
                 if (isWorked) {
-                    const rawDuration = calculateDurationHours("00:00", currentShift.to);
+                    const rawDuration = calculateDurationHours("00:00", prevShift ? prevShift.to : "06:00");
                     const effectiveDuration = rawDuration >= 8 ? rawDuration - 1 : rawDuration;
-                    const [fromH] = currentShift.from.split(":").map(Number);
+                    const [fromH] = prevShift ? prevShift.from.split(":").map(Number) : [22];
                     const eveningHours = fromH >= 21 ? (24 - fromH) : 0;
                     let hours = Math.min(effectiveDuration, Math.max(0, 8 - eveningHours));
 
@@ -888,12 +1028,17 @@ async function exportToExcel() {
         dayRows = dayRows.concat(normalRows);
 
         if (isCrossMidnight && !isWeekend && currentShift) {
-            pendingMorningCarryOver = {
-                originDateStr: dateStr
-            };
+            pendingMorningCarryOver = { originDateStr: dateStr };
+        } else {
+            pendingMorningCarryOver = null;
         }
 
         dayRows.forEach((rowData) => {
+            // Completely skip/remove row if both timeFrom and timeTo are 00:00
+            if (rowData.timeFrom === "00:00" && rowData.timeTo === "00:00") {
+                return;
+            }
+
             totals.nightDiff += parseFloat(rowData.nightDiff) || 0;
             totals.restDayOt += parseFloat(rowData.restDayOt) || 0;
             totals.regDayOt += parseFloat(rowData.regDayOt) || 0;
@@ -923,18 +1068,12 @@ async function exportToExcel() {
             row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
                 cell.border = solidBorder;
                 cell.font = { size: 10, name: 'Calibri', color: { argb: 'FF000000' } };
-                
-                if (colNumber === 1 || colNumber === 2) {
-                    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-                } else if (colNumber >= 3 && colNumber <= 10) {
+                if (colNumber === 1 || colNumber === 2 || (colNumber >= 3 && colNumber <= 10)) {
                     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                 } else {
                     cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
                 }
-
-                if (rowData.isWeekend) {
-                    cell.fill = weekendFill;
-                }
+                if (rowData.isWeekend) cell.fill = weekendFill;
             });
 
             currentRowIndex++;
@@ -955,8 +1094,7 @@ async function exportToExcel() {
     ]);
 
     totalRow.height = 24;
-
-    totalRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+    totalRow.eachCell({ includeEmpty: true }, (cell) => {
         cell.font = { bold: true, size: 10, color: { argb: 'FF000000' }, name: 'Calibri' };
         cell.border = solidBorder;
         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
@@ -964,8 +1102,7 @@ async function exportToExcel() {
 
     const startMonthName = startDate.toLocaleString('en-US', { month: 'long' });
     const endMonthName = endDate.toLocaleString('en-US', { month: 'long' });
-    const endYear = endDate.getFullYear();
-    const fileName = `Timesheet - ${appState.staffName || 'Staff'} - ${startMonthName} to ${endMonthName} ${endYear}.xlsx`;
+    const fileName = `Timesheet - ${appState.staffName || 'Staff'} - ${startMonthName} to ${endMonthName} ${endDate.getFullYear()}.xlsx`;
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -980,11 +1117,8 @@ function toggleTheme() {
     const currentTheme = html.getAttribute("data-theme");
     const newTheme = currentTheme === "dark" ? "light" : "dark";
     html.setAttribute("data-theme", newTheme);
-    
-    const btn = document.getElementById("themeToggleBtn");
-    if (btn) {
-        btn.textContent = newTheme === "dark" ? "🌙 Dark" : "☀️ Light";
-    }
+    const btn = document.getElementById("themeTraceToggleBtn") || document.getElementById("themeToggleBtn");
+    if (btn) btn.textContent = newTheme === "dark" ? "🌙 Dark" : "☀️ Light";
     localStorage.setItem("timesheetTheme", newTheme);
 }
 
