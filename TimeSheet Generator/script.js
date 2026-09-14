@@ -4,9 +4,9 @@ let SHIFTS = {};
 let apiHolidays = {};
 
 let appState = {
-    staffId: "100178",
-    staffName: "Ronald Javier",
-    department: "",
+    staffId: "696969",
+    staffName: "Son Goku",
+    department: "GTSSS",
     reportingManager: "",
     company: "B2BE GSS",
     shiftSchedule: "US1",
