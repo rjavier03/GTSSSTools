@@ -1,4 +1,4 @@
-// Updated JavaScript to completely remove/hide rows where both Time (From) and Time (To) are 00:00[cite: 5]
+// Updated JavaScript with Date.UTC fix to prevent date/weekend shifting upon Excel recalculation
 
 let SHIFTS = {};
 let apiHolidays = {};
@@ -10,7 +10,7 @@ let appState = {
     reportingManager: "",
     company: "B2BE GSS",
     shiftSchedule: "US1",
-    multipleShifts: [], // Array of { fromDate, toDate, shiftKey }
+    multipleShifts: [], 
     cutoffMonth: new Date().toISOString().slice(0, 7),
     leaves: {},              
     workedHolidays: {},      
@@ -46,7 +46,10 @@ function setupInstantCalendarPickers() {
                 dateFormat: "Y-m-d",
                 conformingDateFormat: "Y-m-d",
                 allowInput: false,
-                disableMobile: true
+                disableMobile: true,
+                locale: { 
+                    firstDayOfWeek: 1 
+                }
             });
         }
     });
@@ -77,7 +80,6 @@ function updateShiftDropdownUI() {
             select.appendChild(opt);
         });
 
-        // Add Multiple Shift option
         const multiOpt = document.createElement("option");
         multiOpt.value = "MULTIPLE";
         multiOpt.textContent = "Multiple Shift...";
@@ -831,7 +833,6 @@ function renderTimesheetTable() {
         }
 
         dayRows.forEach((data) => {
-            // Completely skip/remove row if both timeFrom and timeTo are 00:00
             if (data.timeFrom === "00:00" && data.timeTo === "00:00") {
                 return;
             }
@@ -866,8 +867,8 @@ function renderTimesheetTable() {
     }
 
     const totalRow = document.createElement("tr");
+    totalRow.className = "weekend-row";
     totalRow.style.fontWeight = "bold";
-    totalRow.style.backgroundColor = "#6699ff";
     totalRow.style.color = "#0f172a";
     totalRow.innerHTML = `
         <td class="sticky-col col-1" style="background-color: #6699ff;">TOTAL</td>
@@ -1034,7 +1035,6 @@ async function exportToExcel() {
         }
 
         dayRows.forEach((rowData) => {
-            // Completely skip/remove row if both timeFrom and timeTo are 00:00
             if (rowData.timeFrom === "00:00" && rowData.timeTo === "00:00") {
                 return;
             }
@@ -1047,7 +1047,8 @@ async function exportToExcel() {
             totals.transpo += parseFloat(rowData.transportation) || 0;
 
             const [y, m, d] = rowData.dateStr.split("-").map(Number);
-            const localDateVal = new Date(y, m - 1, d);
+            // FIXED: Use Date.UTC to prevent local timezone offset shifting dates by 1 day upon recalculation
+            const localDateVal = new Date(Date.UTC(y, m - 1, d));
 
             const row = worksheet.addRow([
                 localDateVal, 
@@ -1098,6 +1099,7 @@ async function exportToExcel() {
         cell.font = { bold: true, size: 10, color: { argb: 'FF000000' }, name: 'Calibri' };
         cell.border = solidBorder;
         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.fill = weekendFill;
     });
 
     const startMonthName = startDate.toLocaleString('en-US', { month: 'long' });
