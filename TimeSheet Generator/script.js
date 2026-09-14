@@ -497,7 +497,7 @@ function calculateRowsForDate(dateObj) {
         if (targetIsWeekend && appState.weekendOnCallDates[targetDateStr]) {
             row.restDayOt = 8;
             row.timeFrom = "0:00";
-            row.timeTo = "0:00";
+            row.timeTo = "23:59";
             row.nightDiff = 0;
         }
 
@@ -541,7 +541,7 @@ function calculateRowsForDate(dateObj) {
     };
 
     if (isWeekend && appState.weekendOnCallDates[dateStr]) {
-        return [buildRow("", "", holidayInfo, false)];
+        return [buildRow("00:00", "23:59", holidayInfo, false)];
     }
 
     if (currentShift && currentShift.from && currentShift.to) {
