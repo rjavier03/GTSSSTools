@@ -1,7 +1,7 @@
 // Updated JavaScript with Date.UTC fix to prevent date/weekend shifting upon Excel recalculation
 
 let SHIFTS = {};
-let apiHolidays = {};
+let apiHolidays = {};  // keyed by "YYYY-MM-DD" => { name, type, isRegular }
 
 let appState = {
     staffId: "696969",
@@ -10,24 +10,26 @@ let appState = {
     reportingManager: "",
     company: "B2BE GSS",
     shiftSchedule: "AU",
-    multipleShifts: [], 
+    multipleShifts: [],
     cutoffMonth: new Date().toISOString().slice(0, 7),
-    leaves: {},              
-    workedHolidays: {},      
-    weekendOnCallDates: {},  
-    transpoDates: {}         
+    leaves: {},
+    workedHolidays: {},
+    weekendOnCallDates: {},
+    transpoDates: {}
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
     loadLocalStorage();
     setupEventListeners();
     setupInstantCalendarPickers();
-    
+
     await loadShiftsJson();
-    await fetchHolidaysApi();
-    
+    await loadHolidaysJson();
+
     renderAll();
 });
+
+// ─── Calendar Pickers ────────────────────────────────────────────────────────
 
 function setupInstantCalendarPickers() {
     const cutoffInput = document.getElementById("cutoffMonth");
@@ -44,26 +46,30 @@ function setupInstantCalendarPickers() {
             flatpickr(el, {
                 mode: "multiple",
                 dateFormat: "Y-m-d",
-                conformingDateFormat: "Y-m-d",
                 allowInput: false,
                 disableMobile: true,
-                locale: { 
-                    firstDayOfWeek: 1 
-                }
+                locale: { firstDayOfWeek: 1 }
             });
         }
     });
 }
 
+// ─── Shift JSON Loading & Management ──────────────────────────────────────────
+
 async function loadShiftsJson() {
     try {
         const response = await fetch("shifts.json");
         if (response.ok) {
-            SHIFTS = await response.json();
+            const fileShifts = await response.json();
+            SHIFTS = { ...fileShifts };
         }
     } catch (err) {
         console.warn("Could not load shifts.json:", err);
     }
+
+    // Merge custom shifts from localStorage
+    const customShifts = JSON.parse(localStorage.getItem("customShifts") || "{}");
+    Object.assign(SHIFTS, customShifts);
 
     updateShiftDropdownUI();
 }
@@ -88,6 +94,151 @@ function updateShiftDropdownUI() {
     }
 }
 
+// ─── Custom Shift Modals (Add & Delete / Manage) ─────────────────────────────
+
+function openAddCustomShiftModal() {
+    const modal = document.getElementById("addCustomShiftModal");
+    if (modal) {
+        document.getElementById("customShiftKey").value = "";
+        document.getElementById("customShiftLabel").value = "";
+        document.getElementById("customShiftFrom").value = "";
+        document.getElementById("customShiftTo").value = "";
+        document.getElementById("customShiftNd").value = "0";
+        modal.style.display = "flex";
+    }
+}
+
+function closeAddCustomShiftModal() {
+    const modal = document.getElementById("addCustomShiftModal");
+    if (modal) modal.style.display = "none";
+}
+
+function saveCustomShift() {
+    const key = document.getElementById("customShiftKey").value.trim().toUpperCase().replace(/\s+/g, "_");
+    const label = document.getElementById("customShiftLabel").value.trim();
+    const from = document.getElementById("customShiftFrom").value.trim();
+    const to = document.getElementById("customShiftTo").value.trim();
+    const nd = parseInt(document.getElementById("customShiftNd").value, 10) || 0;
+
+    if (!key) { showModal("Please enter a Shift Key (e.g. MY_SHIFT)."); return; }
+    if (!label) { showModal("Please enter a Shift Label."); return; }
+    if (!from || !/^\d{2}:\d{2}$/.test(from)) { showModal("Please enter a valid Time From (HH:MM)."); return; }
+    if (!to || !/^\d{2}:\d{2}$/.test(to)) { showModal("Please enter a valid Time To (HH:MM)."); return; }
+
+    const newShift = { label: `${label} (${from} - ${to})`, from, to, nd };
+
+    // Save to localStorage under customShifts
+    const customShifts = JSON.parse(localStorage.getItem("customShifts") || "{}");
+    customShifts[key] = newShift;
+    localStorage.setItem("customShifts", JSON.stringify(customShifts));
+
+    SHIFTS[key] = newShift;
+    appState.shiftSchedule = key;
+    saveLocalStorage();
+    closeAddCustomShiftModal();
+    updateShiftDropdownUI();
+    renderAll();
+    showModal(`✅ Custom shift <strong>${key}</strong> saved successfully!`);
+}
+
+function openManageCustomShiftsModal() {
+    const modal = document.getElementById("manageCustomShiftsModal");
+    if (!modal) return;
+    const listEl = document.getElementById("customShiftsList");
+    const customShifts = JSON.parse(localStorage.getItem("customShifts") || "{}");
+    const keys = Object.keys(customShifts);
+    if (keys.length === 0) {
+        listEl.innerHTML = "<p style='color:var(--text-muted);font-size:0.85rem;text-align:center;padding:16px 0;'>No custom shifts saved yet.</p>";
+    } else {
+        listEl.innerHTML = keys.map(k => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:6px;margin-bottom:8px;">
+                <div>
+                    <div style="font-weight:600;font-size:0.9rem;">${k}</div>
+                    <div style="font-size:0.8rem;color:var(--text-muted);">${customShifts[k].label}</div>
+                </div>
+                <button type="button" class="btn-delete" onclick="deleteCustomShift('${k}')">🗑️ Delete</button>
+            </div>
+        `).join("");
+    }
+    modal.style.display = "flex";
+}
+
+function closeManageCustomShiftsModal() {
+    const modal = document.getElementById("manageCustomShiftsModal");
+    if (modal) modal.style.display = "none";
+}
+
+function deleteCustomShift(key) {
+    const customShifts = JSON.parse(localStorage.getItem("customShifts") || "{}");
+    if (customShifts[key]) {
+        delete customShifts[key];
+        localStorage.setItem("customShifts", JSON.stringify(customShifts));
+        delete SHIFTS[key];
+        if (appState.shiftSchedule === key) {
+            appState.shiftSchedule = Object.keys(SHIFTS)[0] || "AU";
+            saveLocalStorage();
+        }
+        updateShiftDropdownUI();
+        renderAll();
+        openManageCustomShiftsModal(); // refresh list in modal
+    }
+}
+
+// ─── Holiday Loading (JSON + API fallback) ───────────────────────────────────
+
+async function loadHolidaysJson() {
+    const year = parseInt(appState.cutoffMonth.split("-")[0], 10) || new Date().getFullYear();
+    const prevYear = year - 1;
+
+    let loaded = false;
+    try {
+        const response = await fetch("holidays.json");
+        if (response.ok) {
+            const data = await response.json();
+            apiHolidays = {};
+            [prevYear, year].forEach(y => {
+                const yStr = String(y);
+                if (data[yStr]) {
+                    data[yStr].forEach(h => {
+                        const isRegular = h.type === "Regular Holiday";
+                        const isSpecialWorking = h.type === "Special Working Day";
+                        if (!isSpecialWorking) {
+                            apiHolidays[h.date] = {
+                                name: h.name,
+                                type: h.type,
+                                isRegular
+                            };
+                        }
+                    });
+                }
+            });
+            loaded = true;
+        }
+    } catch (err) {
+        console.warn("Could not load holidays.json:", err);
+    }
+
+    if (!loaded) {
+        await fetchHolidaysApi(year);
+    }
+}
+
+async function fetchHolidaysApi(year) {
+    year = year || (parseInt(appState.cutoffMonth.split("-")[0], 10) || new Date().getFullYear());
+    try {
+        const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/PH`);
+        if (res.ok) {
+            const data = await res.json();
+            data.forEach(item => {
+                const classified = classifyPHHoliday(item, item.date);
+                apiHolidays[item.date] = classified;
+            });
+        }
+    } catch (err) {
+        console.warn("Holiday API error:", err);
+    }
+}
+
 function simplifyHolidayName(rawName, dateStr) {
     const name = rawName.toLowerCase();
     if (dateStr.endsWith("-01-01") || name.includes("new year")) return "New Year's Day";
@@ -100,7 +251,7 @@ function simplifyHolidayName(rawName, dateStr) {
     if (dateStr.endsWith("-11-02") || name.includes("all souls")) return "All Souls' Day";
     if (dateStr.endsWith("-11-30") || name.includes("bonifacio")) return "Bonifacio Day";
     if (dateStr.endsWith("-12-08") || name.includes("immaculate conception")) return "Feast of the Immaculate Conception of Mary";
-    if (dateStr.endsWith("-12-25") || name.includes("christmas")) return "Christmas Day";
+    if (dateStr.endsWith("-12-25") || name.includes("christmas day")) return "Christmas Day";
     if (dateStr.endsWith("-12-30") || name.includes("rizal")) return "Rizal Day";
     if (dateStr.endsWith("-12-31") || name.includes("last day")) return "Last Day of the Year";
     if (name.includes("maundy thursday")) return "Maundy Thursday";
@@ -116,17 +267,16 @@ function classifyPHHoliday(item, dateStr) {
     const rawName = item.localName || item.name || "";
     const nameLower = rawName.toLowerCase();
     const cleanName = simplifyHolidayName(rawName, dateStr);
-    
+
     const gazetteSpecialKeywords = [
-        "ninoy aquino", "benigno", "all saints", "all souls", 
-        "immaculate conception", "last day of the year", 
+        "ninoy aquino", "benigno", "all saints", "all souls",
+        "immaculate conception", "last day of the year",
         "black saturday", "edsa people power", "special non-working"
     ];
-
     const gazetteRegularKeywords = [
-        "new year's day", "maundy thursday", "good friday", 
-        "araw ng kagitingan", "day of valor", "labor day", 
-        "independence day", "national heroes day", "bonifacio day", 
+        "new year's day", "maundy thursday", "good friday",
+        "araw ng kagitingan", "day of valor", "labor day",
+        "independence day", "national heroes day", "bonifacio day",
         "christmas day", "rizal day", "eid'l fitr", "eid'l adha"
     ];
 
@@ -142,26 +292,11 @@ function classifyPHHoliday(item, dateStr) {
     return {
         name: cleanName,
         type: isRegular ? "Regular Holiday" : "Special Non-Working Holiday",
-        isRegular: isRegular
+        isRegular
     };
 }
 
-async function fetchHolidaysApi() {
-    const year = parseInt(appState.cutoffMonth.split("-")[0], 10) || new Date().getFullYear();
-    try {
-        const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/PH`);
-        if (res.ok) {
-            const data = await res.json();
-            apiHolidays = {};
-            data.forEach(item => {
-                const classified = classifyPHHoliday(item, item.date);
-                apiHolidays[item.date] = classified;
-            });
-        }
-    } catch (err) {
-        console.warn("Holiday API error, falling back:", err);
-    }
-}
+// ─── Local Storage ───────────────────────────────────────────────────────────
 
 function loadLocalStorage() {
     const saved = localStorage.getItem("timesheetAppState");
@@ -175,7 +310,7 @@ function loadLocalStorage() {
     setVal("reportingManager", appState.reportingManager);
     setVal("company", appState.company);
     setVal("cutoffMonth", appState.cutoffMonth);
-    
+
     updateShiftDropdownUI();
 
     const theme = localStorage.getItem("timesheetTheme") || "light";
@@ -188,6 +323,8 @@ function saveLocalStorage() {
     localStorage.setItem("timesheetAppState", JSON.stringify(appState));
 }
 
+// ─── Event Listeners ─────────────────────────────────────────────────────────
+
 function setupEventListeners() {
     const inputs = ["staffId", "staffName", "department", "reportingManager", "company", "cutoffMonth"];
     inputs.forEach(id => {
@@ -196,7 +333,7 @@ function setupEventListeners() {
             el.addEventListener("input", async (e) => {
                 appState[id] = e.target.value;
                 saveLocalStorage();
-                if (id === "cutoffMonth") await fetchHolidaysApi();
+                if (id === "cutoffMonth") await loadHolidaysJson();
                 renderAll();
             });
         }
@@ -216,6 +353,8 @@ function setupEventListeners() {
         });
     }
 }
+
+// ─── Multiple Shift Modal & Date Sorting ──────────────────────────────────────
 
 function openMultipleShiftModal() {
     const modal = document.getElementById("multipleShiftModal");
@@ -247,65 +386,36 @@ function populateMultipleShiftModalEntries() {
     const minDate = formatYMD(startDate);
     const maxDate = formatYMD(endDate);
 
-    const list = appState.multipleShifts && appState.multipleShifts.length > 0 
-        ? appState.multipleShifts 
+    const rawList = appState.multipleShifts && appState.multipleShifts.length > 0
+        ? appState.multipleShifts
         : [{ fromDate: "", toDate: "", shiftKey: Object.keys(SHIFTS)[0] || "" }];
+    
+    // Always sort list by start date (fromDate) ascending
+    const list = [...rawList].sort((a, b) => (a.fromDate || "").localeCompare(b.fromDate || ""));
 
     list.forEach((item) => {
-        const row = document.createElement("div");
-        row.className = "multiple-shift-row";
-        
-        let optionsHtml = "";
-        Object.keys(SHIFTS).forEach(k => {
-            optionsHtml += `<option value="${k}" ${item.shiftKey === k ? "selected" : ""}>${SHIFTS[k].label}</option>`;
-        });
-
-        row.innerHTML = `
-            <div>
-                <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">From Date</label>
-                <input type="date" class="ms-from" value="${item.fromDate || ""}" min="${minDate}" max="${maxDate}" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
-            </div>
-            <div>
-                <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">To Date</label>
-                <input type="date" class="ms-to" value="${item.toDate || ""}" min="${minDate}" max="${maxDate}" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
-            </div>
-            <div>
-                <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">Shift Schedule</label>
-                <select class="ms-shift" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
-                    ${optionsHtml}
-                </select>
-            </div>
-            <div style="padding-top:16px;">
-                <button type="button" class="btn-delete" onclick="removeMultipleShiftRow(this)">Remove</button>
-            </div>
-        `;
+        const row = createMultipleShiftRowElement(item, minDate, maxDate);
         container.appendChild(row);
     });
 }
 
-function addMultipleShiftRow() {
-    const container = document.getElementById("multipleShiftEntriesContainer");
-    if (!container) return;
-    
-    const { startDate, endDate } = getCutoffRange(appState.cutoffMonth);
-    const minDate = formatYMD(startDate);
-    const maxDate = formatYMD(endDate);
-    
+function createMultipleShiftRowElement(item, minDate, maxDate) {
     const row = document.createElement("div");
     row.className = "multiple-shift-row";
+
     let optionsHtml = "";
     Object.keys(SHIFTS).forEach(k => {
-        optionsHtml += `<option value="${k}">${SHIFTS[k].label}</option>`;
+        optionsHtml += `<option value="${k}" ${item.shiftKey === k ? "selected" : ""}>${SHIFTS[k].label}</option>`;
     });
 
     row.innerHTML = `
         <div>
             <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">From Date</label>
-            <input type="date" class="ms-from" min="${minDate}" max="${maxDate}" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
+            <input type="date" class="ms-from" value="${item.fromDate || ""}" min="${minDate}" max="${maxDate}" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
         </div>
         <div>
             <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">To Date</label>
-            <input type="date" class="ms-to" min="${minDate}" max="${maxDate}" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
+            <input type="date" class="ms-to" value="${item.toDate || ""}" min="${minDate}" max="${maxDate}" style="width:100%; padding:6px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-color); color:var(--text-color);">
         </div>
         <div>
             <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:2px;">Shift Schedule</label>
@@ -317,6 +427,18 @@ function addMultipleShiftRow() {
             <button type="button" class="btn-delete" onclick="removeMultipleShiftRow(this)">Remove</button>
         </div>
     `;
+    return row;
+}
+
+function addMultipleShiftRow() {
+    const container = document.getElementById("multipleShiftEntriesContainer");
+    if (!container) return;
+
+    const { startDate, endDate } = getCutoffRange(appState.cutoffMonth);
+    const minDate = formatYMD(startDate);
+    const maxDate = formatYMD(endDate);
+
+    const row = createMultipleShiftRowElement({ fromDate: "", toDate: "", shiftKey: Object.keys(SHIFTS)[0] || "" }, minDate, maxDate);
     container.appendChild(row);
 }
 
@@ -357,6 +479,9 @@ function saveMultipleShiftsConfig() {
         return;
     }
 
+    // Sort multiple shifts by fromDate ascending before saving
+    newShifts.sort((a, b) => a.fromDate.localeCompare(b.fromDate));
+
     appState.shiftSchedule = "MULTIPLE";
     appState.multipleShifts = newShifts;
     saveLocalStorage();
@@ -376,10 +501,14 @@ function getShiftForDate(dateStr) {
     return SHIFTS[appState.shiftSchedule] || null;
 }
 
+// ─── Render ──────────────────────────────────────────────────────────────────
+
 function renderAll() {
     renderHolidaysAndLeavesLists();
     renderTimesheetTable();
 }
+
+// ─── Cutoff Range ─────────────────────────────────────────────────────────────
 
 function getCutoffRange(yearMonthStr) {
     const [year, month] = yearMonthStr.split("-").map(Number);
@@ -407,6 +536,8 @@ function parseDatesInput(inputStr) {
     if (!inputStr) return [];
     return inputStr.split(/[\s,]+/).map(s => s.trim()).filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s));
 }
+
+// ─── Leave / Transpo / Weekend Actions ───────────────────────────────────────
 
 function addLeave() {
     const leaveInput = document.getElementById("leaveDate");
@@ -501,6 +632,8 @@ function countCutoffOnCallDays(startDate, endDate) {
     return count;
 }
 
+// ─── Holidays & Leaves List Render ───────────────────────────────────────────
+
 function renderHolidaysAndLeavesLists() {
     const { startDate, endDate } = getCutoffRange(appState.cutoffMonth);
 
@@ -525,7 +658,7 @@ function renderHolidaysAndLeavesLists() {
             if (d >= startDate && d <= endDate) {
                 weekendList.innerHTML += `
                     <li>
-                        <span><strong>${date}</strong> (Weekend Duty)</span> 
+                        <span><strong>${date}</strong> (Weekend Duty)</span>
                         <button class="btn-delete" onclick="deleteWeekendOnCall('${date}')">Remove</button>
                     </li>`;
             }
@@ -580,6 +713,8 @@ function renderHolidaysAndLeavesLists() {
     }
 }
 
+// ─── Time Calculation Helpers ─────────────────────────────────────────────────
+
 function calculateDurationHours(timeFrom, timeTo) {
     if (!timeFrom || !timeTo) return 0;
     const [h1, m1] = timeFrom.split(":").map(Number);
@@ -597,7 +732,7 @@ function calculateNightDiffHours(timeFrom, timeTo) {
     const startDecimal = h1 + (m1 / 60);
     const endDecimal = h2 + (m2 / 60);
     let ndHours = 0;
-    
+
     if (startDecimal < 24 && endDecimal > 22) {
         const segStart = Math.max(startDecimal, 22);
         const segEnd = Math.min(endDecimal, 24);
@@ -611,131 +746,284 @@ function calculateNightDiffHours(timeFrom, timeTo) {
     return Math.min(7, ndHours);
 }
 
-function calculateRowsForDate(dateObj) {
-    const current = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
-    const dateStr = formatYMD(current);
-    const dayName = current.toLocaleDateString("en-US", { weekday: "long" });
-    const dayOfWeek = current.getDay();
-    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-    const holidayInfo = apiHolidays[dateStr];
-    const currentShift = getShiftForDate(dateStr);
+// ─── Timesheet Core Calculation Engine ───────────────────────────────────────
 
-    const buildRow = (timeFrom, timeTo, forceHolidayInfo = null, isMorningCarryOver = false, overrideDateObj = null, overrideDateStr = null, overrideDayName = null, overrideIsWeekend = null) => {
-        const targetHoliday = forceHolidayInfo;
-        const targetDateStr = overrideDateStr || dateStr;
-        const targetDateObj = overrideDateObj || current;
-        const targetDayName = overrideDayName || dayName;
-        const targetIsWeekend = overrideIsWeekend !== null ? overrideIsWeekend : isWeekend;
+/**
+ * Unified timesheet generator used by both Table Preview and Excel Export.
+ *
+ * For cross-midnight shifts (e.g. US1 21:00-06:00 or US2 22:00-07:00):
+ * 1. If Thursday shift is worked and Friday is a holiday:
+ *    - Thursday evening (21:00-00:00): normal ND (2), 0 holiday hours (Thu is not holiday).
+ *    - Friday morning carryover (00:00-06:00): worked on Friday (holiday) -> gets ND (6), 5 holiday hours, Friday holiday remarks.
+ * 2. If Friday shift is NOT worked on holiday (or on leave):
+ *    - Friday evening (21:00-00:00): blank time/hours, Friday holiday remarks.
+ *    - Saturday morning (00:00-06:00): blank (no carryover because Friday shift was not worked).
+ * 3. If Friday shift IS worked on holiday:
+ *    - Friday evening (21:00-00:00): gets ND (2), 3 holiday hours, Friday holiday remarks.
+ *    - Saturday morning carryover (00:00-06:00): gets ND (6), 0 holiday hours (Sat is not holiday).
+ * 4. Night diff is ALWAYS retained when working on a holiday (paid on top of holiday pay).
+ */
+function generateTimesheetData() {
+    const { startDate, endDate } = getCutoffRange(appState.cutoffMonth);
+    const rows = [];
+    let totals = { nightDiff: 0, restDayOt: 0, regDayOt: 0, specialHol: 0, regHol: 0, transpo: 0 };
+    let curr = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+
+    // Track cross-midnight carryover from the previous calendar day
+    // Structure: { originDateStr, prevShift, shiftWasWorked }
+    let pendingMorningCarryOver = null;
+
+    while (curr <= endDate) {
+        const dateStr = formatYMD(curr);
+        const dayOfWeek = curr.getDay();
+        const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+        const dayName = curr.toLocaleDateString("en-US", { weekday: "long" });
+        const currentShift = getShiftForDate(dateStr);
+        const holidayToday = apiHolidays[dateStr] || null;
+        const leaveToday = appState.leaves[dateStr] || null;
+        const workedHolidayToday = holidayToday ? (appState.workedHolidays[dateStr] !== false) : true;
         
-        let ndHours = 0;
-        if (!timeFrom || !timeTo) {
-            ndHours = 0;
-        } else if (targetHoliday && appState.leaves[targetDateStr]) {
-            ndHours = 0;
-        } else {
-            ndHours = calculateNightDiffHours(timeFrom, timeTo);
-        }
+        const isCrossMidnight = currentShift && currentShift.from && currentShift.to && (() => {
+            const [hFrom] = currentShift.from.split(":").map(Number);
+            const [hTo] = currentShift.to.split(":").map(Number);
+            return hTo <= hFrom;
+        })();
 
-        const rawDuration = calculateDurationHours(timeFrom, timeTo);
-        const effectiveDuration = rawDuration >= 8 ? rawDuration - 1 : rawDuration;
+        // ── 1. Morning Carryover Leg from yesterday's cross-midnight shift ──
+        if (pendingMorningCarryOver) {
+            const { originDateStr, prevShift, shiftWasWorked } = pendingMorningCarryOver;
 
-        let row = {
-            dateObj: new Date(targetDateObj.getTime()),
-            dateStr: targetDateStr,
-            displayDate: formatDisplayDate(targetDateObj),
-            dayName: targetDayName,
-            isWeekend: targetIsWeekend,
-            timeFrom: timeFrom,
-            timeTo: timeTo,
-            nightDiff: ndHours,
-            restDayOt: 0,
-            regDayOt: 0,
-            specialHol: 0,
-            regHol: 0,
-            transportation: appState.transpoDates[targetDateStr] || 0,
-            onCall: appState.weekendOnCallDates[targetDateStr] ? "Yes" : "No",
-            remarks: targetHoliday ? targetHoliday.name : ""
-        };
+            // If yesterday's shift was actually WORKED by the employee:
+            if (shiftWasWorked && prevShift) {
+                const morningDateObj = new Date(curr.getFullYear(), curr.getMonth(), curr.getDate());
+                const toTime = prevShift.to || "06:00";
+                
+                // Calculate split holiday hours for morning leg:
+                // Full shift = 8 working hrs. Morning leg = 8 - eveningLegHours.
+                const [prevFromH] = prevShift.from.split(":").map(Number);
+                const prevEveningRaw = prevFromH >= 21 ? (24 - prevFromH) : 0;
+                const prevEveningHol = Math.min(prevEveningRaw, 8);
+                const morningHolHours = Math.max(0, 8 - prevEveningHol);
 
-        if (targetIsWeekend && appState.weekendOnCallDates[targetDateStr]) {
-            row.restDayOt = 8;
-            row.timeFrom = "00:00";
-            row.timeTo = "23:59";
-            row.nightDiff = 0;
-        }
+                let morningRow = {
+                    dateObj: morningDateObj,
+                    dateStr,
+                    displayDate: formatDisplayDate(morningDateObj),
+                    dayName,
+                    isWeekend,
+                    timeFrom: "00:00",
+                    timeTo: toTime,
+                    nightDiff: calculateNightDiffHours("00:00", toTime),
+                    restDayOt: 0,
+                    regDayOt: 0,
+                    specialHol: 0,
+                    regHol: 0,
+                    transportation: appState.transpoDates[dateStr] || 0,
+                    onCall: appState.weekendOnCallDates[dateStr] ? "Yes" : "No",
+                    remarks: holidayToday ? holidayToday.name : ""
+                };
 
-        if (targetHoliday) {
-            const originDate = targetHoliday.dateStr || targetDateStr;
-            const isWorked = appState.workedHolidays[originDate] !== false;
-            row.remarks = targetHoliday.name;
-
-            if (isWorked) {
-                let hours = Math.min(effectiveDuration, 8);
-                if (isMorningCarryOver && currentShift) {
-                    const [fromH] = currentShift.from.split(":").map(Number);
-                    const eveningHours = fromH >= 21 ? (24 - fromH) : 0;
-                    hours = Math.min(effectiveDuration, Math.max(0, 8 - eveningHours));
+                if (holidayToday) {
+                    // This morning portion falls on TODAY's holiday
+                    if (holidayToday.isRegular) {
+                        morningRow.regHol = morningHolHours;
+                    } else {
+                        morningRow.specialHol = morningHolHours;
+                    }
                 }
 
-                if (targetHoliday.isRegular) {
-                    row.regHol = Math.min(8, hours);
+                rows.push(morningRow);
+            }
+            pendingMorningCarryOver = null;
+        }
+
+        // ── 2. Today's Scheduled Shift / Day Row ────────────────────────────
+        if (isWeekend) {
+            if (appState.weekendOnCallDates[dateStr]) {
+                rows.push({
+                    dateObj: new Date(curr.getTime()),
+                    dateStr,
+                    displayDate: formatDisplayDate(curr),
+                    dayName,
+                    isWeekend: true,
+                    timeFrom: "00:00",
+                    timeTo: "23:59",
+                    nightDiff: 0,
+                    restDayOt: 8,
+                    regDayOt: 0,
+                    specialHol: 0,
+                    regHol: 0,
+                    transportation: appState.transpoDates[dateStr] || 0,
+                    onCall: "Yes",
+                    remarks: holidayToday ? holidayToday.name : ""
+                });
+            } else {
+                rows.push({
+                    dateObj: new Date(curr.getTime()),
+                    dateStr,
+                    displayDate: formatDisplayDate(curr),
+                    dayName,
+                    isWeekend: true,
+                    timeFrom: "",
+                    timeTo: "",
+                    nightDiff: 0,
+                    restDayOt: 0,
+                    regDayOt: 0,
+                    specialHol: 0,
+                    regHol: 0,
+                    transportation: appState.transpoDates[dateStr] || 0,
+                    onCall: "No",
+                    remarks: holidayToday ? holidayToday.name : ""
+                });
+            }
+            pendingMorningCarryOver = null;
+        } else {
+            // Weekday
+            if (leaveToday) {
+                // Today is on leave -> Blank row, no working hours
+                rows.push({
+                    dateObj: new Date(curr.getTime()),
+                    dateStr,
+                    displayDate: formatDisplayDate(curr),
+                    dayName,
+                    isWeekend: false,
+                    timeFrom: "",
+                    timeTo: "",
+                    nightDiff: 0,
+                    restDayOt: 0,
+                    regDayOt: 0,
+                    specialHol: 0,
+                    regHol: 0,
+                    transportation: appState.transpoDates[dateStr] || 0,
+                    onCall: "No",
+                    remarks: `Leave ID: ${leaveToday}`
+                });
+                if (isCrossMidnight && currentShift) {
+                    pendingMorningCarryOver = { originDateStr: dateStr, prevShift: currentShift, shiftWasWorked: false };
                 } else {
-                    row.specialHol = Math.min(8, hours);
+                    pendingMorningCarryOver = null;
+                }
+            } else if (holidayToday && !workedHolidayToday) {
+                // Today is a holiday and employee did NOT work on holiday -> Blank row
+                rows.push({
+                    dateObj: new Date(curr.getTime()),
+                    dateStr,
+                    displayDate: formatDisplayDate(curr),
+                    dayName,
+                    isWeekend: false,
+                    timeFrom: "",
+                    timeTo: "",
+                    nightDiff: 0,
+                    restDayOt: 0,
+                    regDayOt: 0,
+                    specialHol: 0,
+                    regHol: 0,
+                    transportation: appState.transpoDates[dateStr] || 0,
+                    onCall: "No",
+                    remarks: holidayToday.name
+                });
+                if (isCrossMidnight && currentShift) {
+                    pendingMorningCarryOver = { originDateStr: dateStr, prevShift: currentShift, shiftWasWorked: false };
+                } else {
+                    pendingMorningCarryOver = null;
                 }
             } else {
-                row.timeFrom = "";
-                row.timeTo = "";
-                row.nightDiff = 0;
+                // Today's shift IS WORKED (normal workday or worked holiday)
+                if (isCrossMidnight && currentShift) {
+                    // Evening leg on today (e.g. 21:00/22:00 to 00:00)
+                    const [fromH] = currentShift.from.split(":").map(Number);
+                    const eveningRaw = fromH >= 21 ? (24 - fromH) : 0;
+                    const eveningHolHours = Math.min(eveningRaw, 8);
+
+                    let eveningRow = {
+                        dateObj: new Date(curr.getTime()),
+                        dateStr,
+                        displayDate: formatDisplayDate(curr),
+                        dayName,
+                        isWeekend: false,
+                        timeFrom: currentShift.from,
+                        timeTo: "00:00",
+                        nightDiff: calculateNightDiffHours(currentShift.from, "00:00"),
+                        restDayOt: 0,
+                        regDayOt: 0,
+                        specialHol: 0,
+                        regHol: 0,
+                        transportation: appState.transpoDates[dateStr] || 0,
+                        onCall: "No",
+                        remarks: holidayToday ? holidayToday.name : ""
+                    };
+
+                    if (holidayToday) {
+                        // Today is holiday and employee worked today's evening
+                        if (holidayToday.isRegular) {
+                            eveningRow.regHol = eveningHolHours;
+                        } else {
+                            eveningRow.specialHol = eveningHolHours;
+                        }
+                    }
+
+                    rows.push(eveningRow);
+                    pendingMorningCarryOver = { originDateStr: dateStr, prevShift: currentShift, shiftWasWorked: true };
+                } else {
+                    // Same-day shift (e.g. AU 06:30 - 15:30)
+                    const shift = currentShift || { from: "06:30", to: "15:30" };
+                    const rawDuration = calculateDurationHours(shift.from, shift.to);
+                    const effectiveDuration = rawDuration >= 8 ? rawDuration - 1 : rawDuration;
+
+                    let dayRow = {
+                        dateObj: new Date(curr.getTime()),
+                        dateStr,
+                        displayDate: formatDisplayDate(curr),
+                        dayName,
+                        isWeekend: false,
+                        timeFrom: shift.from,
+                        timeTo: shift.to,
+                        nightDiff: calculateNightDiffHours(shift.from, shift.to),
+                        restDayOt: 0,
+                        regDayOt: 0,
+                        specialHol: 0,
+                        regHol: 0,
+                        transportation: appState.transpoDates[dateStr] || 0,
+                        onCall: "No",
+                        remarks: holidayToday ? holidayToday.name : ""
+                    };
+
+                    if (holidayToday) {
+                        const holHours = Math.min(8, effectiveDuration);
+                        if (holidayToday.isRegular) {
+                            dayRow.regHol = holHours;
+                        } else {
+                            dayRow.specialHol = holHours;
+                        }
+                    }
+
+                    rows.push(dayRow);
+                    pendingMorningCarryOver = null;
+                }
             }
         }
 
-        if (appState.leaves[targetDateStr]) {
-            row.timeFrom = "";
-            row.timeTo = "";
-            row.nightDiff = 0;
-            row.restDayOt = 0;
-            row.regDayOt = 0;
-            row.specialHol = 0;
-            row.regHol = 0;
-            row.remarks = `Leave ID: ${appState.leaves[targetDateStr]}`;
-        }
-
-        return row;
-    };
-
-    if (isWeekend && appState.weekendOnCallDates[dateStr]) {
-        return [buildRow("00:00", "23:59", holidayInfo, false)];
+        curr.setDate(curr.getDate() + 1);
     }
 
-    if (currentShift && currentShift.from && currentShift.to) {
-        const [hFrom] = currentShift.from.split(":").map(Number);
-        const [hTo] = currentShift.to.split(":").map(Number);
-        const isCrossMidnight = hTo <= hFrom;
+    // Tally totals
+    rows.forEach(r => {
+        totals.nightDiff += parseFloat(r.nightDiff) || 0;
+        totals.restDayOt += parseFloat(r.restDayOt) || 0;
+        totals.regDayOt += parseFloat(r.regDayOt) || 0;
+        totals.specialHol += parseFloat(r.specialHol) || 0;
+        totals.regHol += parseFloat(r.regHol) || 0;
+        totals.transpo += parseFloat(r.transportation) || 0;
+    });
 
-        if (isCrossMidnight) {
-            const rows = [];
-            const eveningLegActive = !isWeekend;
-            if (eveningLegActive) {
-                const eveningHoliday = holidayInfo ? { ...holidayInfo, dateStr } : null;
-                rows.push(buildRow(currentShift.from, "00:00", eveningHoliday, false));
-            }
-            return rows.length > 0 ? rows : [buildRow("", "")];
-        } else {
-            const timeFrom = isWeekend ? "" : currentShift.from;
-            const timeTo = isWeekend ? "" : currentShift.to;
-            return [buildRow(timeFrom, timeTo, holidayInfo, false)];
-        }
-    } 
-    else {
-        const shift = currentShift || { from: "06:30", to: "15:30" };
-        const timeFrom = isWeekend ? "" : shift.from;
-        const timeTo = isWeekend ? "" : shift.to;
-        return [buildRow(timeFrom, timeTo, holidayInfo, false)];
-    }
+    return { rows, totals, startDate, endDate };
 }
 
+// ─── Timesheet Table Render ───────────────────────────────────────────────────
+
 function renderTimesheetTable() {
-    const { startDate, endDate } = getCutoffRange(appState.cutoffMonth);
+    const { rows, totals, startDate, endDate } = generateTimesheetData();
+    
     const periodDisplay = document.getElementById("periodDisplay");
     if (periodDisplay) {
         periodDisplay.value = `${formatDisplayDate(startDate)} - ${formatDisplayDate(endDate)}`;
@@ -745,126 +1033,25 @@ function renderTimesheetTable() {
     if (!tbody) return;
     tbody.innerHTML = "";
 
-    let totals = { nightDiff: 0, restDayOt: 0, regDayOt: 0, specialHol: 0, regHol: 0, transpo: 0 };
-    let curr = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-    let pendingMorningCarryOver = null;
+    rows.forEach((data) => {
+        const tr = document.createElement("tr");
+        if (data.isWeekend) tr.classList.add("weekend-row");
 
-    while (curr <= endDate) {
-        const dateStr = formatYMD(curr);
-        const dayOfWeek = curr.getDay();
-        const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-        const currentShift = getShiftForDate(dateStr);
-        const isCrossMidnight = currentShift && currentShift.from && currentShift.to && (() => {
-            const [hFrom] = currentShift.from.split(":").map(Number);
-            const [hTo] = currentShift.to.split(":").map(Number);
-            return hTo <= hFrom;
-        })();
-
-        let dayRows = [];
-
-        if (pendingMorningCarryOver) {
-            const prevDateStr = pendingMorningCarryOver.originDateStr;
-            const prevShift = getShiftForDate(prevDateStr);
-            const carryHoliday = apiHolidays[dateStr] ? { ...apiHolidays[dateStr], dateStr } : null;
-            
-            const morningDateObj = new Date(curr.getFullYear(), curr.getMonth(), curr.getDate());
-            const morningDayName = morningDateObj.toLocaleDateString("en-US", { weekday: "long" });
-            const morningDayOfWeek = morningDateObj.getDay();
-            const morningIsWeekend = (morningDayOfWeek === 0 || morningDayOfWeek === 6);
-
-            const morningRow = {
-                dateObj: morningDateObj,
-                dateStr,
-                displayDate: formatDisplayDate(morningDateObj),
-                dayName: morningDayName,
-                isWeekend: morningIsWeekend,
-                timeFrom: "00:00",
-                timeTo: prevShift ? prevShift.to : "06:00",
-                nightDiff: (!carryHoliday || !appState.leaves[dateStr]) ? calculateNightDiffHours("00:00", prevShift ? prevShift.to : "06:00") : 0,
-                restDayOt: 0,
-                regDayOt: 0,
-                specialHol: 0,
-                regHol: 0,
-                transportation: appState.transpoDates[dateStr] || 0,
-                onCall: appState.weekendOnCallDates[dateStr] ? "Yes" : "No",
-                remarks: carryHoliday ? carryHoliday.name : ""
-            };
-
-            if (carryHoliday) {
-                const isWorked = appState.workedHolidays[prevDateStr] !== false;
-                morningRow.remarks = carryHoliday.name;
-                if (isWorked) {
-                    const rawDuration = calculateDurationHours("00:00", prevShift ? prevShift.to : "06:00");
-                    const effectiveDuration = rawDuration >= 8 ? rawDuration - 1 : rawDuration;
-                    const [fromH] = prevShift ? prevShift.from.split(":").map(Number) : [22];
-                    const eveningHours = fromH >= 21 ? (24 - fromH) : 0;
-                    let hours = Math.min(effectiveDuration, Math.max(0, 8 - eveningHours));
-
-                    if (carryHoliday.isRegular) {
-                        morningRow.regHol = Math.min(8, hours);
-                    } else {
-                        morningRow.specialHol = Math.min(8, hours);
-                    }
-                } else {
-                    morningRow.timeFrom = "";
-                    morningRow.timeTo = "";
-                    morningRow.nightDiff = 0;
-                }
-            }
-
-            if (appState.leaves[dateStr]) {
-                morningRow.timeFrom = "";
-                morningRow.timeTo = "";
-                morningRow.nightDiff = 0;
-                morningRow.remarks = `Leave ID: ${appState.leaves[dateStr]}`;
-            }
-
-            dayRows.push(morningRow);
-            pendingMorningCarryOver = null;
-        }
-
-        const normalRows = calculateRowsForDate(curr);
-        dayRows = dayRows.concat(normalRows);
-
-        if (isCrossMidnight && !isWeekend && currentShift) {
-            pendingMorningCarryOver = { originDateStr: dateStr };
-        } else {
-            pendingMorningCarryOver = null;
-        }
-
-        dayRows.forEach((data) => {
-            if (data.timeFrom === "00:00" && data.timeTo === "00:00") {
-                return;
-            }
-
-            totals.nightDiff += parseFloat(data.nightDiff) || 0;
-            totals.restDayOt += parseFloat(data.restDayOt) || 0;
-            totals.regDayOt += parseFloat(data.regDayOt) || 0;
-            totals.specialHol += parseFloat(data.specialHol) || 0;
-            totals.regHol += parseFloat(data.regHol) || 0;
-            totals.transpo += parseFloat(data.transportation) || 0;
-
-            const tr = document.createElement("tr");
-            if (data.isWeekend) tr.classList.add("weekend-row");
-
-            tr.innerHTML = `
-                <td class="sticky-col col-1">${data.displayDate}</td>
-                <td class="sticky-col col-2">${data.dayName}</td>
-                <td class="sticky-col col-3">${data.timeFrom}</td>
-                <td class="sticky-col col-4">${data.timeTo}</td>
-                <td>${data.nightDiff || ""}</td>
-                <td>${data.restDayOt || ""}</td>
-                <td>${data.regDayOt || ""}</td>
-                <td>${data.specialHol || ""}</td>
-                <td>${data.regHol || ""}</td>
-                <td>${data.transportation || ""}</td>
-                <td>${data.remarks}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-        curr.setDate(curr.getDate() + 1);
-    }
+        tr.innerHTML = `
+            <td class="sticky-col col-1">${data.displayDate}</td>
+            <td class="sticky-col col-2">${data.dayName}</td>
+            <td class="sticky-col col-3">${data.timeFrom}</td>
+            <td class="sticky-col col-4">${data.timeTo}</td>
+            <td>${data.nightDiff || ""}</td>
+            <td>${data.restDayOt || ""}</td>
+            <td>${data.regDayOt || ""}</td>
+            <td>${data.specialHol || ""}</td>
+            <td>${data.regHol || ""}</td>
+            <td>${data.transportation || ""}</td>
+            <td>${data.remarks}</td>
+        `;
+        tbody.appendChild(tr);
+    });
 
     const totalRow = document.createElement("tr");
     totalRow.className = "weekend-row";
@@ -886,7 +1073,11 @@ function renderTimesheetTable() {
     tbody.appendChild(totalRow);
 }
 
+// ─── Excel Export ─────────────────────────────────────────────────────────────
+
 async function exportToExcel() {
+    const { rows, totals, startDate, endDate } = generateTimesheetData();
+
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Sheet 1');
 
@@ -910,7 +1101,6 @@ async function exportToExcel() {
     const greenAccent6Lighter60Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } };
     const headerFills = { 6: greenAccent6Lighter60Fill, 7: greenAccent6Lighter60Fill, 8: greenAccent6Lighter60Fill, 9: greenAccent6Lighter60Fill, 10: greenAccent6Lighter60Fill };
 
-    const { startDate, endDate } = getCutoffRange(appState.cutoffMonth);
     const cutoffOnCallCount = countCutoffOnCallDays(startDate, endDate);
 
     const headerData = [
@@ -946,142 +1136,41 @@ async function exportToExcel() {
         cell.border = solidBorder;
     });
 
-    let curr = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
     let currentRowIndex = 10;
-    let pendingMorningCarryOver = null;
-    let totals = { nightDiff: 0, restDayOt: 0, regDayOt: 0, specialHol: 0, regHol: 0, transpo: 0 };
 
-    while (curr <= endDate) {
-        const dateStr = formatYMD(curr);
-        const dayOfWeek = curr.getDay();
-        const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
-        const currentShift = getShiftForDate(dateStr);
-        const isCrossMidnight = currentShift && currentShift.from && currentShift.to && (() => {
-            const [hFrom] = currentShift.from.split(":").map(Number);
-            const [hTo] = currentShift.to.split(":").map(Number);
-            return hTo <= hFrom;
-        })();
+    rows.forEach((rowData) => {
+        const [y, m, d] = rowData.dateStr.split("-").map(Number);
+        const localDateVal = new Date(Date.UTC(y, m - 1, d));
 
-        let dayRows = [];
+        const row = worksheet.addRow([
+            localDateVal,
+            { formula: `TEXT(A${currentRowIndex},"DDDD")`, result: rowData.dayName },
+            rowData.timeFrom,
+            rowData.timeTo,
+            rowData.nightDiff || "",
+            rowData.restDayOt || "",
+            rowData.regDayOt || "",
+            rowData.specialHol || "",
+            rowData.regHol || "",
+            rowData.transportation || "",
+            rowData.remarks
+        ]);
 
-        if (pendingMorningCarryOver) {
-            const prevDateStr = pendingMorningCarryOver.originDateStr;
-            const prevShift = getShiftForDate(prevDateStr);
-            const carryHoliday = apiHolidays[dateStr] ? { ...apiHolidays[dateStr], dateStr } : null;
-            
-            const morningDateObj = new Date(curr.getFullYear(), curr.getMonth(), curr.getDate());
-            const morningDayName = morningDateObj.toLocaleDateString("en-US", { weekday: "long" });
-            const morningDayOfWeek = morningDateObj.getDay();
-            const morningIsWeekend = (morningDayOfWeek === 0 || morningDayOfWeek === 6);
+        row.getCell(1).numFmt = 'MM/DD/YYYY';
 
-            const morningRow = {
-                dateObj: morningDateObj,
-                dateStr,
-                displayDate: formatDisplayDate(morningDateObj),
-                dayName: morningDayName,
-                isWeekend: morningIsWeekend,
-                timeFrom: "00:00",
-                timeTo: prevShift ? prevShift.to : "06:00",
-                nightDiff: (!carryHoliday || !appState.leaves[dateStr]) ? calculateNightDiffHours("00:00", prevShift ? prevShift.to : "06:00") : 0,
-                restDayOt: 0,
-                regDayOt: 0,
-                specialHol: 0,
-                regHol: 0,
-                transportation: appState.transpoDates[dateStr] || 0,
-                onCall: appState.weekendOnCallDates[dateStr] ? "Yes" : "No",
-                remarks: carryHoliday ? carryHoliday.name : ""
-            };
-
-            if (carryHoliday) {
-                const isWorked = appState.workedHolidays[prevDateStr] !== false;
-                morningRow.remarks = carryHoliday.name;
-                if (isWorked) {
-                    const rawDuration = calculateDurationHours("00:00", prevShift ? prevShift.to : "06:00");
-                    const effectiveDuration = rawDuration >= 8 ? rawDuration - 1 : rawDuration;
-                    const [fromH] = prevShift ? prevShift.from.split(":").map(Number) : [22];
-                    const eveningHours = fromH >= 21 ? (24 - fromH) : 0;
-                    let hours = Math.min(effectiveDuration, Math.max(0, 8 - eveningHours));
-
-                    if (carryHoliday.isRegular) {
-                        morningRow.regHol = Math.min(8, hours);
-                    } else {
-                        morningRow.specialHol = Math.min(8, hours);
-                    }
-                } else {
-                    morningRow.timeFrom = "";
-                    morningRow.timeTo = "";
-                    morningRow.nightDiff = 0;
-                }
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            cell.border = solidBorder;
+            cell.font = { size: 10, name: 'Calibri', color: { argb: 'FF000000' } };
+            if (colNumber === 1 || colNumber === 2 || (colNumber >= 3 && colNumber <= 10)) {
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            } else {
+                cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
             }
-
-            if (appState.leaves[dateStr]) {
-                morningRow.timeFrom = "";
-                morningRow.timeTo = "";
-                morningRow.nightDiff = 0;
-                morningRow.remarks = `Leave ID: ${appState.leaves[dateStr]}`;
-            }
-
-            dayRows.push(morningRow);
-            pendingMorningCarryOver = null;
-        }
-
-        const normalRows = calculateRowsForDate(curr);
-        dayRows = dayRows.concat(normalRows);
-
-        if (isCrossMidnight && !isWeekend && currentShift) {
-            pendingMorningCarryOver = { originDateStr: dateStr };
-        } else {
-            pendingMorningCarryOver = null;
-        }
-
-        dayRows.forEach((rowData) => {
-            if (rowData.timeFrom === "00:00" && rowData.timeTo === "00:00") {
-                return;
-            }
-
-            totals.nightDiff += parseFloat(rowData.nightDiff) || 0;
-            totals.restDayOt += parseFloat(rowData.restDayOt) || 0;
-            totals.regDayOt += parseFloat(rowData.regDayOt) || 0;
-            totals.specialHol += parseFloat(rowData.specialHol) || 0;
-            totals.regHol += parseFloat(rowData.regHol) || 0;
-            totals.transpo += parseFloat(rowData.transportation) || 0;
-
-            const [y, m, d] = rowData.dateStr.split("-").map(Number);
-            // FIXED: Use Date.UTC to prevent local timezone offset shifting dates by 1 day upon recalculation
-            const localDateVal = new Date(Date.UTC(y, m - 1, d));
-
-            const row = worksheet.addRow([
-                localDateVal, 
-                { formula: `TEXT(A${currentRowIndex},"DDDD")`, result: rowData.dayName },
-                rowData.timeFrom,
-                rowData.timeTo,
-                rowData.nightDiff || "",
-                rowData.restDayOt || "",
-                rowData.regDayOt || "",
-                rowData.specialHol || "",
-                rowData.regHol || "",
-                rowData.transportation || "",
-                rowData.remarks
-            ]);
-
-            row.getCell(1).numFmt = 'MM/DD/YYYY';
-
-            row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-                cell.border = solidBorder;
-                cell.font = { size: 10, name: 'Calibri', color: { argb: 'FF000000' } };
-                if (colNumber === 1 || colNumber === 2 || (colNumber >= 3 && colNumber <= 10)) {
-                    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-                } else {
-                    cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-                }
-                if (rowData.isWeekend) cell.fill = weekendFill;
-            });
-
-            currentRowIndex++;
+            if (rowData.isWeekend) cell.fill = weekendFill;
         });
 
-        curr.setDate(curr.getDate() + 1);
-    }
+        currentRowIndex++;
+    });
 
     const totalRow = worksheet.addRow([
         "TOTAL", "", "", "",
@@ -1114,6 +1203,8 @@ async function exportToExcel() {
     link.click();
 }
 
+// ─── Theme ────────────────────────────────────────────────────────────────────
+
 function toggleTheme() {
     const html = document.documentElement;
     const currentTheme = html.getAttribute("data-theme");
@@ -1123,6 +1214,8 @@ function toggleTheme() {
     if (btn) btn.textContent = newTheme === "dark" ? "🌙 Dark" : "☀️ Light";
     localStorage.setItem("timesheetTheme", newTheme);
 }
+
+// ─── Modal Helpers ────────────────────────────────────────────────────────────
 
 function showModal(message) {
     const modal = document.getElementById("validationModal");

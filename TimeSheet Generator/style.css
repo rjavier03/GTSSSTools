@@ -171,6 +171,29 @@ button {
   cursor: not-allowed;
 }
 
+/* Leaves & Special Entries grouping */
+.special-entry-group {
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-color);
+  margin-bottom: 10px;
+}
+
+.special-entry-group .form-group {
+  margin-bottom: 8px;
+}
+
+.special-entry-group .form-group:last-of-type {
+  margin-bottom: 10px;
+}
+
+/* Full-width button utility */
+.btn-full {
+  width: 100%;
+  text-align: center;
+}
+
 .badge-list {
   list-style: none;
   display: flex;

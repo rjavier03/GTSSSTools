@@ -16,7 +16,7 @@
     <div class="app-container">
       <!-- Header Controls -->
       <header class="app-header">
-        <h1>Timesheet & Attendance Generator</h1>
+        <h1>Timesheet &amp; Attendance Generator</h1>
         <div class="header-actions">
           <button
             id="themeToggleBtn"
@@ -62,7 +62,7 @@
         </div>
 
         <div class="card">
-          <h3>Schedule & Cutoff</h3>
+          <h3>Schedule &amp; Cutoff</h3>
           <div class="form-group">
             <label for="cutoffMonth">Cutoff Month</label>
             <input type="month" id="cutoffMonth" />
@@ -77,49 +77,83 @@
               <!-- Populated dynamically -->
             </select>
           </div>
+          <div style="display: flex; gap: 8px; margin-top: 4px">
+            <button
+              type="button"
+              class="btn-secondary btn-full"
+              onclick="openAddCustomShiftModal()"
+            >
+              ➕ Add Shift
+            </button>
+            <button
+              type="button"
+              class="btn-secondary btn-full"
+              onclick="openManageCustomShiftsModal()"
+            >
+              🗑️ Delete Shifts
+            </button>
+          </div>
         </div>
 
         <div class="card">
-          <h3>Leaves & Special Entries</h3>
-          <div class="form-group">
-            <label for="leaveDate">Leave Date(s)</label>
-            <input type="text" id="leaveDate" placeholder="Select date(s)" />
-          </div>
-          <div class="form-group">
-            <label for="leaveId">Leave ID</label>
-            <input type="text" id="leaveId" placeholder="e.g. LV-12345" />
-          </div>
-          <button type="button" class="btn-secondary" onclick="addLeave()">
-            Add Leave
-          </button>
+          <h3>Leaves &amp; Special Entries</h3>
 
-          <div class="form-group" style="margin-top: 15px">
-            <label for="weekendOnCallDate">Weekend On-Call Date(s)</label>
-            <input
-              type="text"
-              id="weekendOnCallDate"
-              placeholder="Select weekend date(s)"
-            />
+          <!-- Leave Section -->
+          <div class="special-entry-group">
+            <div class="form-group">
+              <label for="leaveDate">Leave Date(s)</label>
+              <input type="text" id="leaveDate" placeholder="Select date(s)" />
+            </div>
+            <div class="form-group">
+              <label for="leaveId">Leave ID</label>
+              <input type="text" id="leaveId" placeholder="e.g. LV-12345" />
+            </div>
+            <button
+              type="button"
+              class="btn-secondary btn-full"
+              onclick="addLeave()"
+            >
+              📋 Add Leave
+            </button>
           </div>
-          <button
-            type="button"
-            class="btn-secondary"
-            onclick="toggleWeekendOnCall()"
-          >
-            Toggle Weekend On-Call
-          </button>
 
-          <div class="form-group" style="margin-top: 15px">
-            <label for="transpoDate">Transportation Allowance Date(s)</label>
-            <input type="text" id="transpoDate" placeholder="Select date(s)" />
+          <!-- Weekend On-Call Section -->
+          <div class="special-entry-group">
+            <div class="form-group">
+              <label for="weekendOnCallDate">Weekend On-Call Date(s)</label>
+              <input
+                type="text"
+                id="weekendOnCallDate"
+                placeholder="Select weekend date(s)"
+              />
+            </div>
+            <button
+              type="button"
+              class="btn-secondary btn-full"
+              onclick="toggleWeekendOnCall()"
+            >
+              📞 Toggle Weekend On-Call
+            </button>
           </div>
-          <button
-            type="button"
-            class="btn-secondary"
-            onclick="addTranspoDate()"
-          >
-            Add Transpo Allowance
-          </button>
+
+          <!-- Transportation Section -->
+          <div class="special-entry-group">
+            <div class="form-group">
+              <label for="transpoDate">Transportation Allowance Date(s)</label>
+              <input
+                type="text"
+                id="transpoDate"
+                placeholder="Select date(s)"
+              />
+            </div>
+            <button
+              type="button"
+              class="btn-secondary btn-full"
+              onclick="addTranspoDate()"
+            >
+              🚌 Add Transpo Allowance
+            </button>
+          </div>
         </div>
       </section>
 
@@ -231,7 +265,8 @@
           "
         >
           Define custom date ranges and assign specific shift schedules for this
-          cutoff period. Dates not covered will use the default shift.
+          cutoff period. Entries are automatically sorted by start date. Dates
+          not covered will use the default shift.
         </p>
 
         <!-- Scrollable entries container -->
@@ -304,7 +339,228 @@
               cursor: pointer;
             "
           >
-            Save & Update Preview
+            Save &amp; Update Preview
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Custom Shift Modal -->
+    <div
+      id="addCustomShiftModal"
+      class="modal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      "
+    >
+      <div class="modal-content" style="width: 100%; max-width: 440px">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+          "
+        >
+          <h3 style="margin: 0">➕ Add Custom Shift</h3>
+          <button
+            type="button"
+            onclick="closeAddCustomShiftModal()"
+            style="
+              background: none;
+              border: none;
+              font-size: 1.25rem;
+              cursor: pointer;
+              color: var(--text-color);
+            "
+          >
+            &times;
+          </button>
+        </div>
+
+        <p
+          style="
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+          "
+        >
+          Custom shifts are saved to your browser and persist across sessions.
+        </p>
+
+        <div class="form-group">
+          <label for="customShiftKey">Shift Key (unique ID)</label>
+          <input
+            type="text"
+            id="customShiftKey"
+            placeholder="e.g. NIGHT1"
+            style="text-transform: uppercase"
+          />
+        </div>
+        <div class="form-group">
+          <label for="customShiftLabel">Display Label</label>
+          <input
+            type="text"
+            id="customShiftLabel"
+            placeholder="e.g. Night Shift 1"
+          />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+          <div class="form-group">
+            <label for="customShiftFrom">Time From (HH:MM)</label>
+            <input type="time" id="customShiftFrom" />
+          </div>
+          <div class="form-group">
+            <label for="customShiftTo">Time To (HH:MM)</label>
+            <input type="time" id="customShiftTo" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="customShiftNd"
+            >Night Diff Hours (manual override, 0 = auto)</label
+          >
+          <input
+            type="number"
+            id="customShiftNd"
+            value="0"
+            min="0"
+            max="8"
+            step="0.5"
+          />
+        </div>
+
+        <div
+          style="
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 16px;
+            margin-top: 8px;
+          "
+        >
+          <button
+            type="button"
+            onclick="closeAddCustomShiftModal()"
+            style="
+              padding: 8px 16px;
+              border-radius: 6px;
+              border: 1px solid var(--border-color);
+              background: var(--bg-color);
+              color: var(--text-color);
+              cursor: pointer;
+            "
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onclick="saveCustomShift()"
+            style="
+              padding: 8px 16px;
+              border-radius: 6px;
+              border: none;
+              background: var(--primary-color, #3b82f6);
+              color: #ffffff;
+              font-weight: 500;
+              cursor: pointer;
+            "
+          >
+            💾 Save Shift
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manage / Delete Custom Shifts Modal -->
+    <div
+      id="manageCustomShiftsModal"
+      class="modal"
+      style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      "
+    >
+      <div class="modal-content" style="width: 100%; max-width: 480px">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+          "
+        >
+          <h3 style="margin: 0">🗑️ Manage Custom Shifts</h3>
+          <button
+            type="button"
+            onclick="closeManageCustomShiftsModal()"
+            style="
+              background: none;
+              border: none;
+              font-size: 1.25rem;
+              cursor: pointer;
+              color: var(--text-color);
+            "
+          >
+            &times;
+          </button>
+        </div>
+
+        <p
+          style="
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+          "
+        >
+          Saved custom shifts in your browser storage:
+        </p>
+
+        <div
+          id="customShiftsList"
+          style="max-height: 250px; overflow-y: auto; margin-bottom: 16px"
+        >
+          <!-- Custom shifts populated dynamically -->
+        </div>
+
+        <div
+          style="
+            display: flex;
+            justify-content: flex-end;
+            border-top: 1px solid var(--border-color);
+            padding-top: 14px;
+          "
+        >
+          <button
+            type="button"
+            onclick="closeManageCustomShiftsModal()"
+            style="
+              padding: 8px 16px;
+              border-radius: 6px;
+              border: 1px solid var(--border-color);
+              background: var(--bg-color);
+              color: var(--text-color);
+              cursor: pointer;
+            "
+          >
+            Close
           </button>
         </div>
       </div>
