@@ -1,0 +1,2090 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>C++ Debug Cout Generator</title>
+
+    <style>
+         :root {
+            --bg: #071025;
+            --panel: #0b1220;
+            --panel2: #020617;
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #e6eef6;
+            --muted: #94a3b8;
+            --accent: #7dd3fc;
+            --success: #4ade80;
+            --danger: #f87171;
+            --warning: #facc15;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+        }
+        
+        .container {
+            width: 95%;
+            max-width: 1700px;
+            margin: 30px auto;
+        }
+        
+        h1 {
+            margin: 0 0 8px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: var(--muted);
+            margin-bottom: 20px;
+        }
+        
+        .settings {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+            padding: 14px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+        
+        .settings label {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .settings input {
+            width: 110px;
+            padding: 9px 12px;
+            border-radius: 7px;
+            border: 1px solid var(--border);
+            background: var(--panel2);
+            color: var(--text);
+            outline: none;
+            font-family: Consolas, monospace;
+            font-size: 14px;
+        }
+        
+        .settings input:focus {
+            border-color: var(--accent);
+        }
+        
+        .hint {
+            color: var(--muted);
+            font-size: 12px;
+        }
+        
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        
+        button {
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        
+        .primary {
+            background: var(--accent);
+            color: #020617;
+            font-weight: bold;
+        }
+        
+        .primary:hover {
+            color: #020617;
+            opacity: .9;
+        }
+        
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .panel-header {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .panel-title {
+            font-weight: bold;
+        }
+        
+        .panel-info {
+            color: var(--muted);
+            font-size: 12px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 650px;
+            resize: vertical;
+            border: 0;
+            outline: none;
+            background: var(--panel2);
+            color: var(--text);
+            padding: 15px;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            tab-size: 4;
+        }
+        
+        .status {
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        
+        .status.success {
+            color: var(--success);
+        }
+        
+        .status.error {
+            color: var(--danger);
+        }
+        
+        .info {
+            margin-top: 15px;
+            padding: 14px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            border-radius: 8px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        .info strong {
+            color: var(--text);
+        }
+        
+        .functions {
+            margin-top: 15px;
+            padding: 14px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .functions-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        
+        .function-list {
+            color: var(--muted);
+            font-family: Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.7;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        
+        .function-item {
+            color: var(--success);
+        }
+        
+        @media (max-width: 900px) {
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+            textarea {
+                height: 450px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>C++ Debug Cout Generator</h1>
+
+        <div class="subtitle">
+            Finds Translation::translate(), follows its subfunctions, and distributes debug cout statements across the entire reachable program.
+        </div>
+
+
+        <!-- SETTINGS -->
+
+        <div class="settings">
+
+            <label for="coutCount">
+        Number of cout:
+    </label>
+
+            <input id="coutCount" type="number" min="1" max="10000" value="20">
+
+            <span class="hint">
+        Example: 20 → test 1 through test 20, distributed across the program
+    </span>
+
+        </div>
+
+
+        <!-- BUTTONS -->
+
+        <div class="toolbar">
+
+            <button class="primary" onclick="generateDebugCode()">
+        Add Debug Cout
+    </button>
+
+            <button onclick="copyOutput()">
+        Copy Output
+    </button>
+
+            <button onclick="clearAll()">
+        Clear
+    </button>
+
+        </div>
+
+
+        <!-- WORKSPACE -->
+
+        <div class="workspace">
+
+
+            <!-- INPUT -->
+
+            <div class="panel">
+
+                <div class="panel-header">
+
+                    <span class="panel-title">
+            Input C++
+        </span>
+
+                    <span class="panel-info">
+            Original code
+        </span>
+
+                </div>
+
+                <textarea id="inputCode" spellcheck="false" placeholder="Paste your C++ source code here...
+
+Example:
+
+int Translation::translate()
+{
+    loadData();
+
+    if (condition)
+    {
+        processData();
+    }
+    else if (condition2)
+    {
+        processOther();
+    }
+    else
+    {
+        handleError();
+    }
+
+    saveData();
+
+    return 0;
+}
+
+void Translation::loadData()
+{
+    readFile();
+    processFile();
+}
+
+void Translation::processData()
+{
+    validate();
+    calculate();
+}
+
+void Translation::validate()
+{
+    checkSomething();
+}
+
+void Translation::calculate()
+{
+    doCalculation();
+}"></textarea>
+
+            </div>
+
+
+            <!-- OUTPUT -->
+
+            <div class="panel">
+
+                <div class="panel-header">
+
+                    <span class="panel-title">
+            Output C++
+        </span>
+
+                    <span class="panel-info">
+            Generated code
+        </span>
+
+                </div>
+
+                <textarea id="outputCode" spellcheck="false" readonly placeholder="Generated code will appear here..."></textarea>
+
+            </div>
+
+        </div>
+
+
+        <!-- STATUS -->
+
+        <div id="status" class="status">
+            Ready.
+        </div>
+
+
+        <!-- FUNCTIONS -->
+
+        <div id="functionsBox" class="functions">
+
+            <div class="functions-title">
+                Reachable functions:
+            </div>
+
+            <div id="functionList" class="function-list"></div>
+
+        </div>
+
+
+        <!-- INFORMATION -->
+
+        <div class="info">
+
+            <strong>Distribution logic</strong>
+
+            <br><br> If you request <strong>20 cout statements</strong>, the tool:
+
+            <br><br> 1. Finds all valid insertion points in
+            <code>Translation::translate()</code>.
+
+            <br> 2. Finds functions called by
+            <code>translate()</code>.
+
+            <br> 3. Recursively finds subfunctions called by those functions.
+
+            <br> 4. Collects all valid insertion points from the entire reachable program.
+
+            <br> 5. Spreads the requested cout statements across those points.
+
+            <br> 6. Uses sequential numbering:
+
+            <code>test 1</code>,
+            <code>test 2</code>,
+            <code>test 3</code>, ...
+
+            <code>test 20</code>.
+
+            <br><br>
+
+            <strong>Protected control flow</strong>
+
+            <br><br> The tool will NOT insert cout:
+
+            <br> • Between <code>if</code> and its body.
+
+            <br> • Between <code>else if</code> and its body.
+
+            <br> • Between <code>else</code> and its body.
+
+            <br> • Between an <code>if</code> block and its <code>else</code>.
+
+            <br> • After <code>return</code>.
+
+            <br> • After <code>break</code>.
+
+            <br> • After <code>continue</code>.
+
+            <br> • Outside <code>Translation::translate()</code> and its reachable subfunctions.
+
+        </div>
+
+    </div>
+
+
+    <script>
+        /* ============================================================
+           REMOVE COMMENTS AND STRINGS
+           ============================================================ */
+
+        function cleanCode(code) {
+
+            let result = "";
+
+            let inString = false;
+            let inChar = false;
+
+            let inLineComment = false;
+            let inBlockComment = false;
+
+            let escaped = false;
+
+
+            for (let i = 0; i < code.length; i++) {
+
+                const c = code[i];
+                const n = code[i + 1];
+
+
+                /* LINE COMMENT */
+
+                if (inLineComment) {
+
+                    if (c === "\n") {
+
+                        inLineComment = false;
+
+                        result += "\n";
+
+                    } else {
+
+                        result += " ";
+                    }
+
+                    continue;
+                }
+
+
+                /* BLOCK COMMENT */
+
+                if (inBlockComment) {
+
+                    if (c === "*" && n === "/") {
+
+                        inBlockComment = false;
+
+                        result += "  ";
+
+                        i++;
+
+                    } else {
+
+                        result +=
+                            c === "\n" ?
+                            "\n" :
+                            " ";
+                    }
+
+                    continue;
+                }
+
+
+                /* STRING */
+
+                if (inString) {
+
+                    if (
+                        c === '"' &&
+                        !escaped
+                    ) {
+
+                        inString = false;
+
+                        result += " ";
+
+                    } else {
+
+                        result +=
+                            c === "\n" ?
+                            "\n" :
+                            " ";
+                    }
+
+
+                    if (
+                        c === "\\" &&
+                        !escaped
+                    ) {
+
+                        escaped = true;
+
+                    } else {
+
+                        escaped = false;
+                    }
+
+                    continue;
+                }
+
+
+                /* CHARACTER */
+
+                if (inChar) {
+
+                    if (
+                        c === "'" &&
+                        !escaped
+                    ) {
+
+                        inChar = false;
+
+                        result += " ";
+
+                    } else {
+
+                        result +=
+                            c === "\n" ?
+                            "\n" :
+                            " ";
+                    }
+
+
+                    if (
+                        c === "\\" &&
+                        !escaped
+                    ) {
+
+                        escaped = true;
+
+                    } else {
+
+                        escaped = false;
+                    }
+
+                    continue;
+                }
+
+
+                /* START LINE COMMENT */
+
+                if (
+                    c === "/" &&
+                    n === "/"
+                ) {
+
+                    inLineComment = true;
+
+                    result += "  ";
+
+                    i++;
+
+                    continue;
+                }
+
+
+                /* START BLOCK COMMENT */
+
+                if (
+                    c === "/" &&
+                    n === "*"
+                ) {
+
+                    inBlockComment = true;
+
+                    result += "  ";
+
+                    i++;
+
+                    continue;
+                }
+
+
+                /* START STRING */
+
+                if (c === '"') {
+
+                    inString = true;
+
+                    result += " ";
+
+                    continue;
+                }
+
+
+                /* START CHARACTER */
+
+                if (c === "'") {
+
+                    inChar = true;
+
+                    result += " ";
+
+                    continue;
+                }
+
+
+                result += c;
+            }
+
+
+            return result;
+        }
+
+
+        /* ============================================================
+           MATCH BRACE
+           ============================================================ */
+
+        function findMatchingBrace(
+            cleaned,
+            openIndex
+        ) {
+
+            let depth = 0;
+
+
+            for (
+                let i = openIndex; i < cleaned.length; i++
+            ) {
+
+                if (
+                    cleaned[i] === "{"
+                ) {
+
+                    depth++;
+
+                } else if (
+                    cleaned[i] === "}"
+                ) {
+
+                    depth--;
+
+                    if (
+                        depth === 0
+                    ) {
+
+                        return i;
+                    }
+                }
+            }
+
+
+            return -1;
+        }
+
+
+        /* ============================================================
+           FIND FUNCTION DEFINITIONS
+           ============================================================ */
+
+        function findFunctions(code) {
+
+            const cleaned =
+                cleanCode(code);
+
+
+            const functions = [];
+
+
+            /*
+                This intentionally supports common C++ forms:
+
+                void foo()
+                int foo()
+                bool foo()
+                void Translation::foo()
+                int Translation::translate()
+
+                It is not intended to be a full C++ parser.
+            */
+
+            const regex =
+                /(?:^|[;\n{}])\s*(?:(?:static|inline|virtual|constexpr|extern|friend|consteval|constinit)\s+)*(?:[\w:<>,*&~]+\s+)+([A-Za-z_]\w*(?:::\w+)*)\s*\(([^()]*)\)\s*(?:const\s*)?(?:noexcept\s*)?(?:\{|$)/gm;
+
+
+            let match;
+
+
+            while (
+                (match = regex.exec(cleaned)) !== null
+            ) {
+
+                const name =
+                    match[1];
+
+
+                const braceIndex =
+                    cleaned.indexOf(
+                        "{",
+                        match.index
+                    );
+
+
+                if (
+                    braceIndex === -1
+                ) {
+                    continue;
+                }
+
+
+                /*
+                    Don't accept a brace too far away.
+                */
+
+                const between =
+                    cleaned.substring(
+                        match.index,
+                        braceIndex
+                    );
+
+
+                if (
+                    between.length > 500
+                ) {
+                    continue;
+                }
+
+
+                const closeIndex =
+                    findMatchingBrace(
+                        cleaned,
+                        braceIndex
+                    );
+
+
+                if (
+                    closeIndex === -1
+                ) {
+                    continue;
+                }
+
+
+                /*
+                    Avoid duplicates.
+                */
+
+                if (
+                    functions.some(
+                        f =>
+                        f.braceStart === braceIndex
+                    )
+                ) {
+                    continue;
+                }
+
+
+                functions.push({
+
+                    name: name,
+
+                    start: match.index,
+
+                    braceStart: braceIndex,
+
+                    end: closeIndex,
+
+                    body: cleaned.substring(
+                        braceIndex + 1,
+                        closeIndex
+                    )
+                });
+            }
+
+
+            return functions;
+        }
+
+
+        /* ============================================================
+           NORMALIZE FUNCTION NAME
+           ============================================================ */
+
+        function shortFunctionName(name) {
+
+            const parts =
+                name.split("::");
+
+            return (
+                parts[parts.length - 1]
+            );
+        }
+
+
+        /* ============================================================
+           FIND FUNCTION CALLS
+           ============================================================ */
+
+        function findFunctionCalls(
+            functionInfo,
+            allFunctions
+        ) {
+
+            const found = [];
+
+
+            for (
+                const candidate
+                of allFunctions
+            ) {
+
+                const shortName =
+                    shortFunctionName(
+                        candidate.name
+                    );
+
+
+                if (!shortName) {
+                    continue;
+                }
+
+
+                /*
+                    Don't allow constructors/destructors
+                    accidentally to match everything.
+                */
+
+                const escaped =
+                    shortName.replace(
+                        /[.*+?^${}()|[\]\\]/g,
+                        "\\$&"
+                    );
+
+
+                const regex =
+                    new RegExp(
+                        "\\b" +
+                        escaped +
+                        "\\s*\\(",
+                        "g"
+                    );
+
+
+                if (
+                    regex.test(
+                        functionInfo.body
+                    )
+                ) {
+
+                    found.push(candidate);
+                }
+            }
+
+
+            return found;
+        }
+
+
+        /* ============================================================
+           FIND REACHABLE FUNCTION TREE
+           ============================================================ */
+
+        function findReachableFunctions(
+            functions
+        ) {
+
+            /*
+                Exact Translation::translate()
+            */
+
+            let root =
+                functions.find(
+                    f =>
+                    f.name
+                    .toLowerCase() ===
+                    "translation::translate"
+                );
+
+
+            /*
+                Fallback to any translate().
+            */
+
+            if (!root) {
+
+                root =
+                    functions.find(
+                        f =>
+                        shortFunctionName(
+                            f.name
+                        )
+                        .toLowerCase() ===
+                        "translate"
+                    );
+            }
+
+
+            if (!root) {
+                return null;
+            }
+
+
+            const reachable = [];
+
+            const visited =
+                new Set();
+
+
+            function visit(fn) {
+
+                if (!fn) {
+                    return;
+                }
+
+
+                if (
+                    visited.has(fn)
+                ) {
+                    return;
+                }
+
+
+                visited.add(fn);
+
+                reachable.push(fn);
+
+
+                const children =
+                    findFunctionCalls(
+                        fn,
+                        functions
+                    );
+
+
+                for (
+                    const child
+                    of children
+                ) {
+
+                    /*
+                        Don't recursively follow the
+                        same function forever.
+                    */
+
+                    visit(child);
+                }
+            }
+
+
+            visit(root);
+
+
+            return reachable;
+        }
+
+
+        /* ============================================================
+           CONTROL STATEMENT
+           ============================================================ */
+
+        function isControlLine(line) {
+
+            const t =
+                line.trim();
+
+
+            if (!t) {
+                return true;
+            }
+
+
+            if (
+                t.startsWith("#")
+            ) {
+                return true;
+            }
+
+
+            if (
+                t.startsWith("//") ||
+                t.startsWith("/*") ||
+                t.startsWith("*")
+            ) {
+                return true;
+            }
+
+
+            if (
+                t === "{" ||
+                t === "}" ||
+                t === "};"
+            ) {
+                return true;
+            }
+
+
+            if (
+                /^(if|else|for|while|switch|do|try|catch)\b/i
+                .test(t)
+            ) {
+                return true;
+            }
+
+
+            return false;
+        }
+
+
+        /* ============================================================
+           SAFE INSERTION STATEMENT
+           ============================================================ */
+
+        function isSafeStatement(line) {
+
+            const t =
+                line.trim();
+
+
+            if (!t) {
+                return false;
+            }
+
+
+            if (
+                isControlLine(line)
+            ) {
+                return false;
+            }
+
+
+            /*
+                These should never have cout after them.
+            */
+
+            if (
+                /^return\b/i.test(t) ||
+                /^break\s*;/i.test(t) ||
+                /^continue\s*;/i.test(t)
+            ) {
+
+                return false;
+            }
+
+
+            /*
+                Existing cout.
+            */
+
+            if (
+                /\b(?:std::)?cout\s*<</.test(t)
+            ) {
+
+                return false;
+            }
+
+
+            /*
+                Only completed statements.
+            */
+
+            if (!t.endsWith(";")) {
+
+                return false;
+            }
+
+
+            return true;
+        }
+
+
+        /* ============================================================
+           INDENT
+           ============================================================ */
+
+        function getIndentation(line) {
+
+            const match =
+                line.match(/^\s*/);
+
+            return match ?
+                match[0] :
+                "";
+        }
+
+
+        /* ============================================================
+           NEXT NON-EMPTY LINE
+           ============================================================ */
+
+        function getNextCodeLine(
+            lines,
+            index,
+            endLine
+        ) {
+
+            for (
+                let i = index + 1; i < endLine; i++
+            ) {
+
+                if (
+                    lines[i].trim()
+                ) {
+
+                    return {
+                        index: i,
+                        text: lines[i].trim()
+                    };
+                }
+            }
+
+
+            return null;
+        }
+
+
+        /* ============================================================
+           SHOULD WE SKIP THIS LOCATION?
+           ============================================================ */
+
+        function isGoodInsertionPoint(
+            lines,
+            index,
+            endLine
+        ) {
+
+            const line =
+                lines[index];
+
+
+            if (!isSafeStatement(line)) {
+
+                return false;
+            }
+
+
+            /*
+                Critical:
+
+                If next line is:
+
+                    else
+                    else if
+
+                then inserting here would break compilation.
+            */
+
+            const next =
+                getNextCodeLine(
+                    lines,
+                    index,
+                    endLine
+                );
+
+
+            if (next) {
+
+                if (
+                    /^else\b/i.test(
+                        next.text
+                    )
+                ) {
+
+                    return false;
+                }
+
+
+                /*
+                    catch following try.
+                */
+
+                if (
+                    /^catch\b/i.test(
+                        next.text
+                    )
+                ) {
+
+                    return false;
+                }
+            }
+
+
+            return true;
+        }
+
+
+        /* ============================================================
+           CHARACTER POSITION TO LINE
+           ============================================================ */
+
+        function charToLine(
+            code,
+            position
+        ) {
+
+            return (
+                code
+                .substring(
+                    0,
+                    position
+                )
+                .split("\n")
+                .length - 1
+            );
+        }
+
+
+        /* ============================================================
+           COLLECT ALL VALID INSERTION POINTS
+           ============================================================ */
+
+        function collectInsertionPoints(
+            code,
+            lines,
+            reachableFunctions
+        ) {
+
+            const points = [];
+
+
+            for (
+                const fn
+                of reachableFunctions
+            ) {
+
+                const startLine =
+                    charToLine(
+                        code,
+                        fn.braceStart
+                    );
+
+
+                const endLine =
+                    charToLine(
+                        code,
+                        fn.end
+                    );
+
+
+                for (
+                    let i = startLine + 1; i < endLine; i++
+                ) {
+
+                    if (
+                        isGoodInsertionPoint(
+                            lines,
+                            i,
+                            endLine
+                        )
+                    ) {
+
+                        points.push({
+
+                            line: i,
+
+                            function: fn,
+
+                            functionStart: startLine,
+
+                            functionEnd: endLine
+                        });
+                    }
+                }
+            }
+
+
+            return points;
+        }
+
+
+        /* ============================================================
+           DISTRIBUTE POINTS ACROSS WHOLE PROGRAM
+           ============================================================ */
+
+        function selectDistributedPoints(
+            points,
+            requested
+        ) {
+
+            if (
+                points.length <= requested
+            ) {
+
+                /*
+                    Fewer valid locations than requested.
+
+                    Use all of them.
+                */
+
+                return points.slice();
+            }
+
+
+            /*
+                We want points spread over the entire
+                program.
+
+                The easiest reliable method:
+
+                    index =
+                        round(
+                            i * (total - 1) / (requested - 1)
+                        )
+
+                Example:
+
+                    100 valid locations
+                    20 requested
+
+                gives approximately:
+
+                    0
+                    5
+                    10
+                    16
+                    ...
+                    99
+            */
+
+            const selected = [];
+
+            const used =
+                new Set();
+
+
+            for (
+                let i = 0; i < requested; i++
+            ) {
+
+                let index;
+
+
+                if (
+                    requested === 1
+                ) {
+
+                    index =
+                        Math.floor(
+                            points.length / 2
+                        );
+
+                } else {
+
+                    index =
+                        Math.round(
+                            i *
+                            (points.length - 1) /
+                            (requested - 1)
+                        );
+                }
+
+
+                /*
+                    Make sure we don't select
+                    the same point twice.
+                */
+
+                while (
+                    used.has(index) &&
+                    index < points.length - 1
+                ) {
+
+                    index++;
+                }
+
+
+                if (
+                    used.has(index)
+                ) {
+
+                    index =
+                        Math.max(
+                            0,
+                            index - 1
+                        );
+                }
+
+
+                if (!used.has(index)) {
+
+                    used.add(index);
+
+                    selected.push(
+                        points[index]
+                    );
+                }
+            }
+
+
+            return selected;
+        }
+
+
+        /* ============================================================
+           IMPROVE DISTRIBUTION ACROSS FUNCTIONS
+           ============================================================ */
+
+        function distributeAcrossFunctions(
+            points,
+            requested
+        ) {
+
+            /*
+                If there are only a few functions,
+                simple global distribution works well.
+
+                If there are many functions, however,
+                we want to make sure a large function doesn't
+                consume all the debug points.
+
+                First group locations by function.
+            */
+
+            const groups =
+                new Map();
+
+
+            for (
+                const point
+                of points
+            ) {
+
+                if (!groups.has(
+                        point.function
+                    )) {
+
+                    groups.set(
+                        point.function, []
+                    );
+                }
+
+
+                groups
+                    .get(point.function)
+                    .push(point);
+            }
+
+
+            const functions =
+                Array.from(
+                    groups.keys()
+                );
+
+
+            /*
+                If there is only one function,
+                use normal distribution.
+            */
+
+            if (
+                functions.length <= 1
+            ) {
+
+                return selectDistributedPoints(
+                    points,
+                    requested
+                );
+            }
+
+
+            /*
+                We want at least one debug point in
+                each reachable function if possible.
+            */
+
+            const selected = [];
+
+
+            /*
+                First pass:
+                one point per function.
+
+                But don't exceed requested count.
+            */
+
+            for (
+                const fn
+                of functions
+            ) {
+
+                if (
+                    selected.length >= requested
+                ) {
+
+                    break;
+                }
+
+
+                const locations =
+                    groups.get(fn);
+
+
+                /*
+                    Select a representative location
+                    from the function.
+
+                    Middle is generally better than first.
+                */
+
+                const middle =
+                    Math.floor(
+                        locations.length / 2
+                    );
+
+
+                selected.push(
+                    locations[middle]
+                );
+            }
+
+
+            /*
+                If we still need more points,
+                distribute the remaining points globally.
+            */
+
+            const selectedKeys =
+                new Set(
+                    selected.map(
+                        p =>
+                        `${p.line}|${p.function.name}`
+                    )
+                );
+
+
+            const remaining =
+                points.filter(
+                    p =>
+                    !selectedKeys.has(
+                        `${p.line}|${p.function.name}`
+                    )
+                );
+
+
+            const additionalCount =
+                requested -
+                selected.length;
+
+
+            if (
+                additionalCount > 0 &&
+                remaining.length > 0
+            ) {
+
+                const additional =
+                    selectDistributedPoints(
+                        remaining,
+                        Math.min(
+                            additionalCount,
+                            remaining.length
+                        )
+                    );
+
+
+                selected.push(
+                    ...additional
+                );
+            }
+
+
+            /*
+                Sort selected locations by their
+                original source position.
+
+                This ensures test 1 appears before
+                test 2 in the source code.
+            */
+
+            selected.sort(
+                (a, b) =>
+                a.line - b.line
+            );
+
+
+            return selected;
+        }
+
+
+        /* ============================================================
+           GENERATE
+           ============================================================ */
+
+        function generateDebugCode() {
+
+            const input =
+                document.getElementById(
+                    "inputCode"
+                ).value;
+
+
+            if (!input.trim()) {
+
+                setStatus(
+                    "Please paste your C++ code first.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            let requested =
+                parseInt(
+                    document.getElementById(
+                        "coutCount"
+                    ).value,
+                    10
+                );
+
+
+            if (
+                isNaN(requested) ||
+                requested < 1
+            ) {
+
+                setStatus(
+                    "Enter a valid number of cout statements.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            if (
+                requested > 10000
+            ) {
+
+                requested = 10000;
+
+                document.getElementById(
+                    "coutCount"
+                ).value = 10000;
+            }
+
+
+            const lines =
+                input.split(/\r?\n/);
+
+
+            /*
+                Find every function in the source.
+            */
+
+            const functions =
+                findFunctions(input);
+
+
+            if (
+                functions.length === 0
+            ) {
+
+                setStatus(
+                    "No C++ functions were detected.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            /*
+                Find translate() and all functions
+                reachable from it.
+            */
+
+            const reachable =
+                findReachableFunctions(
+                    functions
+                );
+
+
+            if (!reachable ||
+                reachable.length === 0
+            ) {
+
+                setStatus(
+                    "Could not find Translation::translate().",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            /*
+                Find ALL valid debug locations
+                across the entire reachable program.
+            */
+
+            const points =
+                collectInsertionPoints(
+                    input,
+                    lines,
+                    reachable
+                );
+
+
+            if (
+                points.length === 0
+            ) {
+
+                setStatus(
+                    "No safe cout insertion locations were found.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            /*
+                Spread the requested number across
+                the entire program.
+            */
+
+            const selected =
+                distributeAcrossFunctions(
+                    points,
+                    requested
+                );
+
+
+            /*
+                Create map:
+
+                    line -> cout statements
+            */
+
+            const insertions =
+                new Map();
+
+
+            /*
+                Number sequentially.
+            */
+
+            selected.forEach(
+                (point, index) => {
+
+                    const number =
+                        index + 1;
+
+
+                    if (!insertions.has(
+                            point.line
+                        )) {
+
+                        insertions.set(
+                            point.line, []
+                        );
+                    }
+
+
+                    const indent =
+                        getIndentation(
+                            lines[point.line]
+                        );
+
+
+                    insertions
+                        .get(point.line)
+                        .push(
+                            indent +
+                            `cout << "test ${number}" << endl;`
+                        );
+                }
+            );
+
+
+            /*
+                Build final source.
+            */
+
+            const output = [];
+
+
+            for (
+                let i = 0; i < lines.length; i++
+            ) {
+
+                /*
+                    Original line.
+                */
+
+                output.push(
+                    lines[i]
+                );
+
+
+                /*
+                    Insert debug lines.
+                */
+
+                if (
+                    insertions.has(i)
+                ) {
+
+                    output.push(
+                        ...insertions.get(i)
+                    );
+                }
+            }
+
+
+            const result =
+                output.join("\n");
+
+
+            document.getElementById(
+                    "outputCode"
+                ).value =
+                result;
+
+
+            /*
+                Show function information.
+            */
+
+            showFunctions(
+                reachable,
+                selected
+            );
+
+
+            /*
+                Status.
+            */
+
+            if (
+                selected.length === requested
+            ) {
+
+                setStatus(
+                    `Added ${selected.length} cout statements and distributed them across ${reachable.length} reachable function(s) and ${points.length} possible locations.`,
+                    "success"
+                );
+
+            } else {
+
+                setStatus(
+                    `Only ${selected.length} safe cout locations were available, so ${selected.length} cout statements were added.`,
+                    "success"
+                );
+            }
+        }
+
+
+        /* ============================================================
+           SHOW FUNCTION LIST
+           ============================================================ */
+
+        function showFunctions(
+            functions,
+            selected
+        ) {
+
+            const box =
+                document.getElementById(
+                    "functionsBox"
+                );
+
+
+            const list =
+                document.getElementById(
+                    "functionList"
+                );
+
+
+            list.innerHTML = "";
+
+
+            for (
+                const fn
+                of functions
+            ) {
+
+                const count =
+                    selected.filter(
+                        p =>
+                        p.function === fn
+                    ).length;
+
+
+                const div =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                div.className =
+                    "function-item";
+
+
+                div.textContent =
+                    `✓ ${fn.name}  →  ${count} cout`;
+
+
+                list.appendChild(
+                    div
+                );
+            }
+
+
+            box.style.display =
+                "block";
+        }
+
+
+        /* ============================================================
+           STATUS
+           ============================================================ */
+
+        function setStatus(
+            message,
+            type
+        ) {
+
+            const status =
+                document.getElementById(
+                    "status"
+                );
+
+
+            status.textContent =
+                message;
+
+
+            status.className =
+                "status " +
+                (type || "");
+        }
+
+
+        /* ============================================================
+           COPY
+           ============================================================ */
+
+        async function copyOutput() {
+
+            const output =
+                document.getElementById(
+                    "outputCode"
+                );
+
+
+            if (!output.value.trim()) {
+
+                setStatus(
+                    "Nothing to copy.",
+                    "error"
+                );
+
+                return;
+            }
+
+
+            try {
+
+                await navigator.clipboard.writeText(
+                    output.value
+                );
+
+
+                setStatus(
+                    "Output copied to clipboard.",
+                    "success"
+                );
+
+            } catch (error) {
+
+                output.focus();
+
+                output.select();
+
+                document.execCommand(
+                    "copy"
+                );
+
+
+                setStatus(
+                    "Output copied to clipboard.",
+                    "success"
+                );
+            }
+        }
+
+
+        /* ============================================================
+           CLEAR
+           ============================================================ */
+
+        function clearAll() {
+
+            document.getElementById(
+                "inputCode"
+            ).value = "";
+
+
+            document.getElementById(
+                "outputCode"
+            ).value = "";
+
+
+            document.getElementById(
+                    "functionsBox"
+                ).style.display =
+                "none";
+
+
+            document.getElementById(
+                "functionList"
+            ).innerHTML = "";
+
+
+            setStatus(
+                "Cleared.",
+                ""
+            );
+        }
+
+
+        /* ============================================================
+           CTRL + ENTER
+           ============================================================ */
+
+        document
+            .getElementById("inputCode")
+            .addEventListener(
+                "keydown",
+                function(event) {
+
+                    if (
+                        event.ctrlKey &&
+                        event.key === "Enter"
+                    ) {
+
+                        generateDebugCode();
+                    }
+                }
+            );
+    </script>
+
+</body>
+
+</html>
