@@ -93,6 +93,7 @@
   <div class="row">
     <button class="primary" onclick="generateOutput()">Generate</button>
     <button id="copyBtn" onclick="copyOutput()">Copy</button>
+    <button id="clearBtn" onclick="clearForm()">Clear</button>
   </div>
 
   <div class="label" style="margin-top:20px;">Generated Output:</div>
@@ -124,7 +125,7 @@ function generateOutput() {
   const output =
 `${prefix} : ${translationName}
 ${changes ? changes + "\n" : ""}
-Total Man Hours: ${totalHrs}hrs
+Total Man Hours: ${totalHrs}${totalHrs === "1" ? "hr" : "hrs"}
 Dev/Test: ${devTest}
 Review/Export: ${reviewExport}
 Impacted: ${impacted}
@@ -143,6 +144,17 @@ function sumHours(dev, review) {
   const d = parseFloat(dev) || 0.5;
   const r = parseFloat(review) || 0.5;
   return (d + r).toFixed(1).replace(/\.0$/, '');
+}
+
+function clearForm() {
+  document.getElementById("translationName").value = "";
+  document.getElementById("changes").value = "";
+  document.getElementById("devTest").value = "";
+  document.getElementById("reviewExport").value = "";
+  document.getElementById("impacted").value = "";
+  document.getElementById("pending").value = "";
+  document.getElementById("output").textContent = "";
+  document.getElementById("copyBtn").textContent = "Copy";
 }
 
 function copyOutput() {
